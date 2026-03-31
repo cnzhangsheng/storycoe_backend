@@ -332,6 +332,7 @@ class BookService:
         book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
 
         if not book:
+            logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
             raise NotFoundException(message="书籍未找到")
 
         # 查找句子
@@ -342,7 +343,8 @@ class BookService:
 
         # 校验句子所属页面是否属于该书籍
         page = self.db.query(BookPage).filter(BookPage.id == sentence.page_id).first()
-        if not page or page.book_id != book_id:
+        if not page or str(page.book_id) != str(book_id):
+            logger.warning(f"句子不属于该书籍: sentence_id={sentence_id}, page_book_id={page.book_id if page else None}, request_book_id={book_id}")
             raise NotFoundException(message="句子不属于该书籍")
 
         # 更新句子
