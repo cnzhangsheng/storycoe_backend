@@ -428,3 +428,45 @@ class BookService:
             "audio_url": sentence.audio_url,
             "created_at": sentence.created_at,
         }
+
+    def reorder_sentences(self, book_id: str, user_id: str, page_number: int, sentence_ids: list[str]) -> None:
+        """重新排序句子。
+
+        Args:
+            book_id: 书籍 ID
+            user_id: 用户 ID
+            page_number: 页码
+            sentence_ids: 新顺序的句子 ID 列表
+
+        Raises:
+            NotFoundException: 书籍或页面不存在
+        """
+        # 校验书籍权限
+        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+
+        if not book:
+            logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
+            raise NotFoundException(message="书籍未找到")
+
+        # 获取页面
+        page = self.db.query(BookPage).filter(
+            BookPage.book_id == book_id,
+            BookPage.page_number == page_number,
+        ).first()
+
+        if not page:
+            logger.warning(f"页面不存在: book_id={book_id}, page_number={page_number}")
+            raise NotFoundException(message="页面未找到")
+
+        # 更新句子排序
+        for index, sentence_id in enumerate(sentence_ids):
+            sentence = self.db.query(Sentence).filter(
+                Sentence.id == sentence_id,
+                Sentence.page_id == page.id,
+            ).first()
+
+            if sentence:
+                sentence.sentence_order = index + 1
+
+        self.db.commit()
+        logger.info(f"句子排序已更新: book_id={book_id}, page={page_number}, order={sentence_ids}")

@@ -194,6 +194,11 @@ class SentenceCreateRequest(BaseModel):
     zh: str = Field(default="", min_length=0)
 
 
+class SentenceReorderRequest(BaseModel):
+    """Request to reorder sentences."""
+    sentence_ids: list[str] = Field(..., min_length=1)
+
+
 class SentenceResponse(SentenceBase):
     """Sentence response model."""
     id: UUID

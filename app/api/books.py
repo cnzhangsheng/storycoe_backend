@@ -17,6 +17,7 @@ from app.models.schemas import (
     SentenceUpdate,
     SentenceResponse,
     SentenceCreateRequest,
+    SentenceReorderRequest,
 )
 from app.services import get_book_service
 from app.services.book_service import BookService
@@ -122,6 +123,19 @@ async def update_sentence(
     """Update a sentence in a book."""
     sentence = book_service.update_sentence(book_id, current_user["id"], sentence_id, sentence_data)
     return SentenceResponse(**sentence)
+
+
+@router.put("/{book_id}/pages/{page_number}/sentences/reorder")
+async def reorder_sentences(
+    book_id: str,
+    page_number: int,
+    request: SentenceReorderRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    book_service: Annotated[BookService, Depends(get_book_service)],
+):
+    """Reorder sentences in a book page."""
+    book_service.reorder_sentences(book_id, current_user["id"], page_number, request.sentence_ids)
+    return MessageResponse(message="句子排序已更新", success=True)
 
 
 @router.post("/generate", response_model=GenerateBookResponse)
