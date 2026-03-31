@@ -16,6 +16,8 @@ class FileStorageService:
 
     目录结构:
     uploads/
+    ├── avatars/
+    │   └── {user_id}.jpg
     └── books/
         └── {book_id}/
             ├── cover.jpg
@@ -29,12 +31,14 @@ class FileStorageService:
         """初始化文件存储服务。"""
         self.base_dir = Path(settings.upload_dir)
         self.books_dir = self.base_dir / "books"
+        self.avatars_dir = self.base_dir / "avatars"
         self._ensure_dirs()
 
     def _ensure_dirs(self):
         """确保基础目录存在。"""
         self.books_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"文件存储目录: {self.books_dir.absolute()}")
+        self.avatars_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"文件存储目录: {self.base_dir.absolute()}")
 
     def create_book_dir(self, book_id: str) -> Path:
         """创建书籍目录。
@@ -153,6 +157,34 @@ class FileStorageService:
             logger.info(f"删除书籍目录: {book_dir}")
             return True
         return False
+
+    def save_avatar(
+        self,
+        user_id: str,
+        image_data: bytes,
+        extension: str = "jpg",
+    ) -> str:
+        """保存用户头像。
+
+        Args:
+            user_id: 用户 ID
+            image_data: 图片字节数据
+            extension: 图片扩展名
+
+        Returns:
+            头像 URL
+        """
+        self.avatars_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{user_id}.{extension}"
+        filepath = self.avatars_dir / filename
+
+        with open(filepath, "wb") as f:
+            f.write(image_data)
+
+        avatar_url = f"/static/avatars/{filename}"
+        logger.info(f"保存用户头像: {avatar_url}")
+        return avatar_url
 
 
 # 全局实例
