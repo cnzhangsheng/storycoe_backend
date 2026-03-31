@@ -25,6 +25,16 @@ from app.services.book_service import BookService
 router = APIRouter(prefix="/books", tags=["Books"])
 
 
+@router.post("/generate", response_model=GenerateBookResponse)
+async def generate_book(
+    request: GenerateBookRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    book_service: Annotated[BookService, Depends(get_book_service)],
+):
+    """Generate a book from images (async task)."""
+    return book_service.generate_book(current_user["id"], request)
+
+
 @router.get("", response_model=BookListResponse)
 async def list_books(
     page: int = 1,
@@ -136,13 +146,3 @@ async def reorder_sentences(
     """Reorder sentences in a book page."""
     book_service.reorder_sentences(book_id, current_user["id"], page_number, request.sentence_ids)
     return MessageResponse(message="句子排序已更新", success=True)
-
-
-@router.post("/generate", response_model=GenerateBookResponse)
-async def generate_book(
-    request: GenerateBookRequest,
-    current_user: Annotated[dict, Depends(get_current_user)],
-    book_service: Annotated[BookService, Depends(get_book_service)],
-):
-    """Generate a book from images (async task)."""
-    return book_service.generate_book(current_user["id"], request)
