@@ -40,9 +40,9 @@ async def update_user_profile(
 
 @router.post("/avatar", response_model=UserResponse)
 async def upload_avatar(
-    avatar: UploadFile = File(...),
     current_user: Annotated[dict, Depends(get_current_user)],
     user_service: Annotated[UserService, Depends(get_user_service)],
+    avatar: UploadFile = File(...),
 ):
     """Upload user avatar."""
     # 读取图片数据
