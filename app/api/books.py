@@ -108,7 +108,7 @@ async def create_sentence(
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
     """Create a new sentence in a book page."""
-    sentence = book_service.create_sentence(book_id, current_user["id"], page_number, sentence_data)
+    sentence = await book_service.create_sentence(book_id, current_user["id"], page_number, sentence_data)
     return SentenceResponse(**sentence)
 
 

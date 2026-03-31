@@ -202,3 +202,61 @@ ZH: 下一个中文翻译
 
 # 全局实例
 ocr_service = OcrService()
+
+
+async def translate_text(text: str) -> str:
+    """翻译英文文本为中文。
+
+    Args:
+        text: 英文文本
+
+    Returns:
+        中文翻译
+    """
+    if not text or not text.strip():
+        return ""
+
+    try:
+        headers = {
+            "Authorization": f"Bearer {settings.aliyun_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": "qwen3.5-plus",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"""请将以下英文翻译成中文。要求：
+1. 翻译准确、自然，适合儿童阅读
+2. 只输出中文翻译，不要添加任何解释或说明
+
+英文原文：
+{text}
+
+中文翻译：""",
+                }
+            ],
+            "max_tokens": 1000,
+            "temperature": 0.1,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://coding.dashscope.aliyuncs.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+
+            if response.status_code != 200:
+                logger.error(f"翻译 API 调用失败: {response.status_code}")
+                return ""
+
+            result = response.json()
+            translation = result["choices"][0]["message"]["content"].strip()
+            logger.info(f"翻译完成: {text[:30]}... -> {translation[:30]}...")
+            return translation
+
+    except Exception as e:
+        logger.error(f"翻译失败: {e}")
+        return ""
