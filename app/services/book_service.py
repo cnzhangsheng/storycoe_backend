@@ -17,7 +17,6 @@ from app.models.schemas import (
     SentenceCreateRequest,
 )
 from app.models.db_models import Book, BookPage, Sentence
-from app.services.ocr_service import translate_text
 
 
 class BookService:
@@ -369,7 +368,7 @@ class BookService:
             "created_at": sentence.created_at,
         }
 
-    async def create_sentence(self, book_id: str, user_id: str, page_number: int, sentence_data: SentenceCreateRequest) -> dict:
+    def create_sentence(self, book_id: str, user_id: str, page_number: int, sentence_data: SentenceCreateRequest) -> dict:
         """创建句子。
 
         Args:
@@ -406,15 +405,8 @@ class BookService:
             Sentence.page_id == page.id
         ).count()
 
-        # 如果没有提供中文翻译，尝试自动翻译
-        zh = sentence_data.zh
-        if not zh and sentence_data.en:
-            try:
-                logger.info(f"自动翻译英文句子: {sentence_data.en[:50]}...")
-                zh = await translate_text(sentence_data.en)
-            except Exception as e:
-                logger.warning(f"翻译失败，使用空字符串: {e}")
-                zh = ""  # 翻译失败时使用空字符串，后续可以手动补充
+        # 直接使用传入的中文翻译，不再自动翻译
+        zh = sentence_data.zh if sentence_data.zh else ""
 
         # 创建新句子（序号为当前最大+1）
         new_order = max_order + 1
