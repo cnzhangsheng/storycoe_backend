@@ -1,4 +1,5 @@
 """API routes for book generation."""
+import asyncio
 import base64
 from typing import List
 
@@ -11,7 +12,7 @@ from app.core.database import get_db
 from app.api.auth import get_current_user
 from app.models.schemas import MessageResponse
 from app.services.file_storage_service import file_storage
-from app.services.ocr_service import ocr_service
+from app.services.ocr_service import ocr_service, OcrSentence
 from app.models.db_models import Book, BookPage, Sentence
 
 router = APIRouter(prefix="/generate", tags=["Book Generation"])
@@ -91,7 +92,9 @@ async def generate_book(
             current_step += 1
             yield progress_message(current_step, f"已创建绘本: {title}")
 
-            # 步骤2: 处理每张图片
+            # 步骤2: 读取并保存所有图片
+            page_data_list = []  # 存储 (page, image_data) 用于后续 OCR
+
             for i, image_file in enumerate(images):
                 # 读取图片数据
                 image_data = await image_file.read()
@@ -113,11 +116,23 @@ async def generate_book(
                 db.add(page)
                 db.flush()
 
-                # OCR 识别
-                logger.info(f"开始 OCR 识别: book_id={book_id}, page={i + 1}")
-                sentences = await ocr_service.recognize_image(image_data)
+                page_data_list.append((page, image_data))
 
-                # 保存句子
+            current_step += 1
+            yield progress_message(current_step, f"正在识别 {len(images)} 张图片中的文字...")
+
+            # 步骤3: 并行 OCR 识别所有图片
+            logger.info(f"开始并行 OCR 识别: book_id={book_id}, pages={len(page_data_list)}")
+
+            ocr_tasks = [
+                ocr_service.recognize_image(image_data)
+                for _, image_data in page_data_list
+            ]
+            ocr_results: List[List[OcrSentence]] = await asyncio.gather(*ocr_tasks)
+
+            # 步骤4: 保存所有句子
+            for idx, (page, _) in enumerate(page_data_list):
+                sentences = ocr_results[idx]
                 for j, sentence in enumerate(sentences):
                     sentence_record = Sentence(
                         page_id=page.id,
@@ -127,16 +142,15 @@ async def generate_book(
                     )
                     db.add(sentence_record)
 
-                db.commit()
+            db.commit()
 
-                current_step += 1
-                progress = int((current_step / total_steps) * 100)
-                yield progress_message(
-                    current_step,
-                    f"已处理 {i + 1}/{len(images)} 张图片",
-                )
+            current_step += 1
+            yield progress_message(
+                current_step,
+                f"已完成文字识别，共处理 {len(images)} 张图片",
+            )
 
-            # 步骤3: 完成
+            # 步骤5: 完成
             book.status = "completed"
             book.has_audio = True
             db.commit()
