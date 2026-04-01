@@ -105,7 +105,7 @@ ZH: 下一个中文翻译
             "temperature": 0.1,  # 低温度确保稳定性
         }
 
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(timeout=1200.0) as client:  # 20分钟超时
             response = await client.post(
                 self.base_url,
                 headers=headers,
@@ -241,7 +241,7 @@ async def translate_text(text: str) -> str:
             "temperature": 0.1,
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:  # 5分钟超时（翻译）
             response = await client.post(
                 "https://coding.dashscope.aliyuncs.com/v1/chat/completions",
                 headers=headers,
