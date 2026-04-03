@@ -130,8 +130,11 @@ async def update_sentence(
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
-    """Update a sentence in a book."""
-    sentence = book_service.update_sentence(book_id, current_user["id"], sentence_id, sentence_data)
+    """Update a sentence in a book.
+
+    当英文句子有变化时，会自动调用 AI 服务翻译成中文。
+    """
+    sentence = await book_service.update_sentence(book_id, current_user["id"], sentence_id, sentence_data)
     return SentenceResponse(**sentence)
 
 

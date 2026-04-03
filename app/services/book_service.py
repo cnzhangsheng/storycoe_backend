@@ -17,6 +17,7 @@ from app.models.schemas import (
     SentenceCreateRequest,
 )
 from app.models.db_models import Book, BookPage, Sentence
+from app.services.translation_service import translation_service
 
 
 class BookService:
@@ -314,7 +315,7 @@ class BookService:
             message="书籍生成已开始",
         )
 
-    def update_sentence(self, book_id: str, user_id: str, sentence_id: str, sentence_data: SentenceUpdate) -> dict:
+    async def update_sentence(self, book_id: str, user_id: str, sentence_id: str, sentence_data: SentenceUpdate) -> dict:
         """更新句子。
 
         Args:
@@ -348,15 +349,34 @@ class BookService:
             logger.warning(f"句子不属于该书籍: sentence_id={sentence_id}, page_book_id={page.book_id if page else None}, request_book_id={book_id}")
             raise NotFoundException(message="句子不属于该书籍")
 
-        # 更新句子
-        update_dict = sentence_data.model_dump(exclude_unset=True)
+        # 检查英文是否有变化，如果有则自动翻译
+        new_en = sentence_data.en
+        old_en = sentence.en
 
-        if update_dict:
-            for key, value in update_dict.items():
-                setattr(sentence, key, value)
-            self.db.commit()
-            self.db.refresh(sentence)
-            logger.info(f"更新句子: sentence_id={sentence_id}, fields={list(update_dict.keys())}")
+        if new_en is not None and new_en != old_en:
+            logger.info(f"英文句子有变化，自动翻译: '{old_en}' -> '{new_en}'")
+
+            # 调用翻译服务
+            new_zh = await translation_service.translate_sentence(new_en)
+
+            if new_zh:
+                sentence.en = new_en
+                sentence.zh = new_zh
+                logger.info(f"句子更新并翻译成功: en='{new_en}', zh='{new_zh}'")
+            else:
+                # 翻译失败，只更新英文
+                sentence.en = new_en
+                logger.warning(f"翻译失败，只更新英文: en='{new_en}'")
+        else:
+            # 英文没变化，直接更新其他字段
+            update_dict = sentence_data.model_dump(exclude_unset=True)
+            if update_dict:
+                for key, value in update_dict.items():
+                    setattr(sentence, key, value)
+
+        self.db.commit()
+        self.db.refresh(sentence)
+        logger.info(f"更新句子完成: sentence_id={sentence_id}")
 
         return {
             "id": str(sentence.id),
