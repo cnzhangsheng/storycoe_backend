@@ -265,10 +265,30 @@ async def get_book_detail(
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
-    """获取绘本详情"""
+    """获取绘本详情（包含 pages 和 sentences）"""
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="绘本不存在")
+
+    # 构建 pages 数据
+    pages_data = []
+    for page in (book.pages or []):
+        sentences_data = []
+        for sentence in (page.sentences or []):
+            sentences_data.append({
+                "id": str(sentence.id),
+                "sentence_order": sentence.sentence_order,
+                "en": sentence.en,
+                "zh": sentence.zh,
+                "audio_url": sentence.audio_url,
+            })
+
+        pages_data.append({
+            "id": str(page.id),
+            "page_number": page.page_number,
+            "image_url": page.image_url,
+            "sentences": sentences_data,
+        })
 
     return AdminBookDetailResponse(
         id=str(book.id),
@@ -281,7 +301,7 @@ async def get_book_detail(
         has_audio=book.has_audio,
         cover_image=book.cover_image,
         created_at=book.created_at.isoformat() if book.created_at else None,
-        pages_count=len(book.pages) if book.pages else 0,
+        pages=pages_data,
     )
 
 

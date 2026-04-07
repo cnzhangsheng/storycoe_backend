@@ -350,6 +350,23 @@ class AdminBookListResponse(BaseModel):
     books: list[dict]
 
 
+class SentenceResponse(BaseModel):
+    """Sentence response for admin."""
+    id: str
+    sentence_order: int
+    en: str
+    zh: str
+    audio_url: Optional[str] = None
+
+
+class BookPageResponse(BaseModel):
+    """Book page response for admin."""
+    id: str
+    page_number: int
+    image_url: Optional[str] = None
+    sentences: list[SentenceResponse] = []
+
+
 class AdminBookDetailResponse(BaseModel):
     """Admin book detail response."""
     id: str
@@ -362,7 +379,7 @@ class AdminBookDetailResponse(BaseModel):
     has_audio: bool
     cover_image: Optional[str] = None
     created_at: str
-    pages_count: int
+    pages: list[BookPageResponse] = []
 
 
 class AdminStatsOverviewResponse(BaseModel):
