@@ -297,6 +297,102 @@ class ErrorResponse(BaseModel):
     error_code: Optional[str] = None
 
 
+# ============================================
+# Admin Models
+# ============================================
+
+class AdminLoginRequest(BaseModel):
+    """Admin login request."""
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
+class AdminTokenResponse(BaseModel):
+    """Admin token response."""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class AdminUserResponse(BaseModel):
+    """Admin user response (for listing users)."""
+    id: UUID
+    name: str
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
+    level: int = 1
+    books_read: int = 0
+    stars: int = 0
+    streak: int = 0
+    is_active: bool = True
+    is_banned: bool = False
+    banned_reason: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserListResponse(BaseModel):
+    """Admin user list response with pagination."""
+    total: int
+    page: int
+    page_size: int
+    users: list[AdminUserResponse]
+
+
+class AdminBookListResponse(BaseModel):
+    """Admin book list response with pagination."""
+    total: int
+    page: int
+    page_size: int
+    books: list[dict]
+
+
+class AdminBookDetailResponse(BaseModel):
+    """Admin book detail response."""
+    id: str
+    title: str
+    user_id: str
+    user_name: Optional[str] = None
+    status: str
+    progress: int
+    level: int
+    has_audio: bool
+    cover_image: Optional[str] = None
+    created_at: str
+    pages_count: int
+
+
+class AdminStatsOverviewResponse(BaseModel):
+    """Admin stats overview response."""
+    total_users: int
+    total_books: int
+    new_users_today: int
+    new_books_today: int
+    readings_today: int
+
+
+class AdminBanRequest(BaseModel):
+    """Admin ban user request."""
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class SystemConfigResponse(BaseModel):
+    """System config response."""
+    key: str
+    value: str
+    description: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class SystemConfigUpdate(BaseModel):
+    """System config update request."""
+    value: str
+    description: Optional[str] = None
+
+
 # Update forward references
 BookPageDetailResponse.model_rebuild()
 BookDetailResponse.model_rebuild()

@@ -12,6 +12,7 @@ from app.core.exceptions import BusinessException
 from app.core.logging import setup_logging, get_logger
 from app.core.database import init_db
 from app.api import auth_router, books_router, users_router, reading_router, ocr_router, generate_router
+from app.api.admin import router as admin_router
 
 # 配置日志
 setup_logging(settings.log_level)
@@ -111,6 +112,7 @@ app.include_router(users_router)
 app.include_router(reading_router)
 app.include_router(ocr_router)
 app.include_router(generate_router)
+app.include_router(admin_router)
 
 
 @app.get("/")
