@@ -199,13 +199,10 @@ async def delete_user(
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
-    """删除用户"""
+    """删除用户（级联删除关联数据）"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-
-    # 先删除关联的阅读进度
-    db.query(ReadingProgress).filter(ReadingProgress.user_id == user_id).delete()
 
     db.delete(user)
     db.commit()

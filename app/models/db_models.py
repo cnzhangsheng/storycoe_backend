@@ -29,8 +29,9 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 关系
-    settings: Mapped["UserSettings"] = relationship("UserSettings", back_populates="user", uselist=False)
+    settings: Mapped["UserSettings"] = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
     books: Mapped[list["Book"]] = relationship("Book", back_populates="user", cascade="all, delete-orphan")
+    reading_progress: Mapped[list["ReadingProgress"]] = relationship("ReadingProgress", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
@@ -129,7 +130,7 @@ class ReadingProgress(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 关系
-    user: Mapped["User"] = relationship("User")
+    user: Mapped["User"] = relationship("User", back_populates="reading_progress")
     book: Mapped["Book"] = relationship("Book", back_populates="reading_progress")
 
 
