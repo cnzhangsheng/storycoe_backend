@@ -38,7 +38,7 @@ ADMIN_PASSWORD_HASH = hashlib.sha256(ADMIN_PASSWORD.encode()).hexdigest()
 def verify_admin_token(token: str) -> bool:
     """验证管理员 JWT Token"""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
         return payload.get("role") == "admin"
     except Exception:
         return False
@@ -75,7 +75,7 @@ async def admin_login(request: AdminLoginRequest):
         "role": "admin",
         "exp": datetime.utcnow() + timedelta(hours=24),
     }
-    token = jwt.encode(token_data, settings.SECRET_KEY, algorithm="HS256")
+    token = jwt.encode(token_data, settings.secret_key, algorithm="HS256")
 
     return AdminTokenResponse(
         access_token=token,
