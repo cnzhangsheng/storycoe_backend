@@ -204,6 +204,9 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
+    # 先删除关联的阅读进度
+    db.query(ReadingProgress).filter(ReadingProgress.user_id == user_id).delete()
+
     db.delete(user)
     db.commit()
 
