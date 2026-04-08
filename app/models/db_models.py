@@ -75,6 +75,7 @@ class Book(Base):
     is_new: Mapped[bool] = mapped_column(Boolean, default=True)
     has_audio: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft, generating, completed, error
+    share_type: Mapped[str] = mapped_column(String(10), default="private")  # public, private
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

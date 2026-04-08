@@ -90,6 +90,7 @@ async def generate_book(
     title: str = Form(...),
     cover: UploadFile = File(None),
     images: List[UploadFile] = File(...),
+    share_type: str = Form("private"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -102,6 +103,7 @@ async def generate_book(
         title: 绘本标题
         cover: 封面图片（可选，单张）
         images: 上传的图片列表
+        share_type: 分享类型，public 或 private，默认 private
         current_user: 当前用户
         db: 数据库会话
 
@@ -114,7 +116,7 @@ async def generate_book(
         }
     """
     user_id = current_user["id"]
-    logger.info(f"上传绘本: user_id={user_id}, title={title}, images_count={len(images)}")
+    logger.info(f"上传绘本: user_id={user_id}, title={title}, images_count={len(images)}, share_type={share_type}")
 
     try:
         # 步骤1: 创建书籍记录
@@ -124,6 +126,7 @@ async def generate_book(
             level=1,
             status="uploading",
             is_new=True,
+            share_type=share_type,
         )
         db.add(book)
         db.flush()

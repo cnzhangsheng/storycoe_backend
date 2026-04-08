@@ -90,6 +90,7 @@ class BookBase(BaseModel):
     """Base book model."""
     title: str = Field(..., max_length=255, min_length=1)
     level: int = Field(default=1, ge=1, le=10)
+    share_type: str = Field(default="private", pattern="^(public|private)$")
 
 
 class BookCreate(BookBase):
@@ -106,6 +107,7 @@ class BookUpdate(BaseModel):
     is_new: Optional[bool] = None
     has_audio: Optional[bool] = None
     status: Optional[str] = Field(None, pattern="^(draft|generating|completed|error)$")
+    share_type: Optional[str] = Field(None, pattern="^(public|private)$")
 
 
 class BookResponse(BookBase):
@@ -117,6 +119,7 @@ class BookResponse(BookBase):
     is_new: bool = False
     has_audio: bool = False
     status: str = "draft"
+    share_type: str = "private"
     created_at: datetime
     updated_at: datetime
 

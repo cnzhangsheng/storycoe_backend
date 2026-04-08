@@ -52,6 +52,21 @@ async def list_books(
     )
 
 
+@router.get("/public", response_model=BookListResponse)
+async def list_public_books(
+    page: int = 1,
+    page_size: int = 20,
+    level: int | None = None,
+    book_service: Annotated[BookService, Depends(get_book_service)] = None,
+):
+    """List public books (no authentication required)."""
+    return book_service.list_public_books(
+        page=page,
+        page_size=page_size,
+        level=level,
+    )
+
+
 @router.post("", response_model=BookResponse)
 async def create_book(
     book_data: BookCreate,

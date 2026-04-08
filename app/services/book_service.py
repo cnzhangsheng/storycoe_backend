@@ -77,6 +77,62 @@ class BookService:
                     is_new=book.is_new,
                     has_audio=book.has_audio,
                     status=book.status,
+                    share_type=book.share_type,
+                    created_at=book.created_at,
+                    updated_at=book.updated_at,
+                )
+                for book in books
+            ],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    def list_public_books(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        level: Optional[int] = None,
+    ) -> BookListResponse:
+        """获取公开绘本列表。
+
+        Args:
+            page: 页码
+            page_size: 每页数量
+            level: 级别筛选
+
+        Returns:
+            书籍列表响应
+        """
+        query = self.db.query(Book).filter(
+            Book.share_type == "public",
+            Book.status == "completed",
+        )
+
+        if level:
+            query = query.filter(Book.level == level)
+
+        # 获取总数
+        total = query.count()
+
+        # 分页查询
+        books = query.order_by(Book.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+        logger.debug(f"获取公开绘本列表: page={page}, total={total}, level={level}")
+
+        return BookListResponse(
+            books=[
+                BookResponse(
+                    id=book.id,
+                    user_id=book.user_id,
+                    title=book.title,
+                    level=book.level,
+                    progress=book.progress,
+                    cover_image=book.cover_image,
+                    is_new=book.is_new,
+                    has_audio=book.has_audio,
+                    status=book.status,
+                    share_type=book.share_type,
                     created_at=book.created_at,
                     updated_at=book.updated_at,
                 )
@@ -102,6 +158,7 @@ class BookService:
             title=book_data.title,
             level=book_data.level,
             cover_image=book_data.cover_image,
+            share_type=book_data.share_type,
             is_new=True,
             status="draft",
         )
@@ -109,7 +166,7 @@ class BookService:
         self.db.commit()
         self.db.refresh(book)
 
-        logger.info(f"创建书籍: book_id={book.id}, user_id={user_id}, title={book_data.title}")
+        logger.info(f"创建书籍: book_id={book.id}, user_id={user_id}, title={book_data.title}, share_type={book.share_type}")
 
         return {
             "id": str(book.id),
@@ -121,6 +178,7 @@ class BookService:
             "is_new": book.is_new,
             "has_audio": book.has_audio,
             "status": book.status,
+            "share_type": book.share_type,
             "created_at": book.created_at,
             "updated_at": book.updated_at,
         }
@@ -169,6 +227,7 @@ class BookService:
             "is_new": book.is_new,
             "has_audio": book.has_audio,
             "status": book.status,
+            "share_type": book.share_type,
             "created_at": book.created_at,
             "updated_at": book.updated_at,
             "pages": pages_data,
