@@ -216,7 +216,8 @@ class BookService:
             raise NotFoundException(message="书籍未找到")
 
         # 权限检查：用户是所有者，或者书籍是公开的
-        if book.user_id != user_id and book.share_type != "public":
+        # 注意：book.user_id 是 UUID 类型，需要转换为字符串比较
+        if str(book.user_id) != user_id and book.share_type != "public":
             logger.warning(f"无权限访问书籍: book_id={book_id}, user_id={user_id}")
             raise NotFoundException(message="书籍未找到")
 
