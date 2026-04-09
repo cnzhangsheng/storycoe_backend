@@ -1,7 +1,7 @@
 """API routes for books."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.api.auth import get_current_user
 from app.models.schemas import (
@@ -143,14 +143,41 @@ async def update_sentence(
     book_id: str,
     sentence_id: str,
     sentence_data: SentenceUpdate,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
-    """Update a sentence in a book.
+    """更新句子。
 
-    当英文句子有变化时，会自动调用 AI 服务翻译成中文。
+    当英文句子有变化时，会在后台异步翻译成中文。
+    返回结果中 translating=True 表示正在翻译中。
     """
     sentence = await book_service.update_sentence(book_id, current_user["id"], sentence_id, sentence_data)
+
+    # 如果需要翻译，启动后台任务
+    if sentence.pop("translating", False):
+        from app.core.database import SessionLocal
+        from app.services.translation_service import translation_service
+        from app.models.db_models import Sentence
+        from uuid import UUID
+
+        async def do_translate():
+            """后台翻译任务"""
+            db = SessionLocal()
+            try:
+                sentence_obj = db.query(Sentence).filter(Sentence.id == UUID(sentence_id)).first()
+                if sentence_obj and sentence_obj.en:
+                    new_zh = await translation_service.translate_sentence(sentence_obj.en)
+                    if new_zh:
+                        sentence_obj.zh = new_zh
+                        db.commit()
+            except Exception as e:
+                print(f"翻译失败: {e}")
+            finally:
+                db.close()
+
+        background_tasks.add_task(do_translate)
+
     return SentenceResponse(**sentence)
 
 
