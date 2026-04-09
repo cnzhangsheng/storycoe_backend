@@ -84,6 +84,59 @@ async def process_ocr_task(book_id: str, page_data_list: List[tuple]):
         db.close()
 
 
+async def process_single_page_ocr(page_id: str, image_data: bytes):
+    """后台 OCR 处理单个页面。
+
+    Args:
+        page_id: 页面 ID
+        image_data: 图片数据
+    """
+    from app.core.database import SessionLocal
+    from uuid import UUID
+
+    db = SessionLocal()
+    try:
+        logger.info(f"开始单页 OCR 任务: page_id={page_id}")
+
+        # 获取页面
+        page = db.query(BookPage).filter(BookPage.id == UUID(page_id)).first()
+        if not page:
+            logger.error(f"页面不存在: page_id={page_id}")
+            return
+
+        # 运行 OCR
+        sentences = await ocr_service.recognize_image(image_data)
+
+        # 保存句子
+        for j, sentence in enumerate(sentences):
+            sentence_record = Sentence(
+                page_id=page.id,
+                sentence_order=j + 1,
+                en=sentence.en,
+                zh=sentence.zh,
+            )
+            db.add(sentence_record)
+
+        # 更新页面状态为完成
+        page.status = "completed"
+        db.commit()
+
+        logger.info(f"单页 OCR 任务完成: page_id={page_id}, sentences={len(sentences)}")
+
+    except Exception as e:
+        logger.error(f"单页 OCR 任务失败: page_id={page_id}, error={e}\n{traceback.format_exc()}")
+        # 更新页面状态为错误
+        try:
+            page = db.query(BookPage).filter(BookPage.id == UUID(page_id)).first()
+            if page:
+                page.status = "error"
+                db.commit()
+        except:
+            pass
+    finally:
+        db.close()
+
+
 @router.post("/book")
 async def generate_book(
     background_tasks: BackgroundTasks,

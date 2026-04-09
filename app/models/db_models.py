@@ -93,6 +93,7 @@ class BookPage(Base):
     book_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("books.id", ondelete="CASCADE"), index=True)
     page_number: Mapped[int] = mapped_column(Integer)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="completed")  # processing, completed, error
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 关系

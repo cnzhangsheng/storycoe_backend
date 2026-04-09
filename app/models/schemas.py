@@ -156,6 +156,7 @@ class BookPageBase(BaseModel):
     """Base book page model."""
     page_number: int = Field(..., ge=1)
     image_url: Optional[str] = None
+    status: str = Field(default="completed", pattern="^(processing|completed|error)$")
 
 
 class BookPageCreate(BookPageBase):

@@ -253,8 +253,10 @@ async def check_shelf_status(
 @router.post("/{book_id}/pages", response_model=BookPageResponse)
 async def create_page(
     book_id: str,
+    background_tasks: BackgroundTasks,
     image: UploadFile = File(...),
     page_number: int | None = None,
+    run_ocr: bool = True,
     current_user: Annotated[dict, Depends(get_current_user)] = None,
     book_service: Annotated[BookService, Depends(get_book_service)] = None,
 ):
@@ -264,6 +266,7 @@ async def create_page(
         book_id: 书籍 ID
         image: 页面图片
         page_number: 页码（可选，默认添加到最后）
+        run_ocr: 是否运行 OCR 识别（默认 True）
 
     Returns:
         创建的页面信息
@@ -274,7 +277,18 @@ async def create_page(
         user_id=current_user["id"],
         image_data=image_data,
         page_number=page_number,
+        run_ocr=run_ocr,
     )
+
+    # 如果需要 OCR，启动后台任务
+    if run_ocr:
+        from app.api.generate import process_single_page_ocr
+        background_tasks.add_task(
+            process_single_page_ocr,
+            page_id=page["id"],
+            image_data=image_data,
+        )
+
     return BookPageResponse(**page)
 
 

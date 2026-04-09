@@ -233,6 +233,7 @@ class BookService:
                 "book_id": str(page.book_id),
                 "page_number": page.page_number,
                 "image_url": page.image_url,
+                "status": page.status,
                 "created_at": page.created_at,
                 "sentences": [],  # 句子通过 get_book_page 获取
             })
@@ -372,6 +373,7 @@ class BookService:
             "book_id": str(page.book_id),
             "page_number": page.page_number,
             "image_url": page.image_url,
+            "status": page.status,
             "created_at": page.created_at,
             "sentences": [
                 {
@@ -728,6 +730,7 @@ class BookService:
         user_id: str,
         image_data: bytes,
         page_number: int | None = None,
+        run_ocr: bool = True,
     ) -> dict:
         """创建新页面。
 
@@ -736,6 +739,7 @@ class BookService:
             user_id: 用户 ID（用于权限校验）
             image_data: 图片数据
             page_number: 页码（可选，默认添加到最后）
+            run_ocr: 是否运行 OCR 识别（默认 True）
 
         Returns:
             创建的页面数据
@@ -783,18 +787,20 @@ class BookService:
             book_id=UUID(book_id),
             page_number=page_number,
             image_url=image_url,
+            status="processing" if run_ocr else "completed",
         )
         self.db.add(page)
         self.db.commit()
         self.db.refresh(page)
 
-        logger.info(f"创建页面: book_id={book_id}, page_number={page_number}")
+        logger.info(f"创建页面: book_id={book_id}, page_number={page_number}, run_ocr={run_ocr}")
 
         return {
             "id": str(page.id),
             "book_id": str(page.book_id),
             "page_number": page.page_number,
             "image_url": page.image_url,
+            "status": page.status,
             "created_at": page.created_at,
         }
 
