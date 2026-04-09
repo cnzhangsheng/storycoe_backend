@@ -1,7 +1,7 @@
 """API routes for books."""
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
 
 from app.api.auth import get_current_user
 from app.models.schemas import (
@@ -12,6 +12,7 @@ from app.models.schemas import (
     BookListResponse,
     ShelfListResponse,
     BookPageDetailResponse,
+    BookPageResponse,
     GenerateBookRequest,
     GenerateBookResponse,
     MessageResponse,
@@ -242,3 +243,55 @@ async def check_shelf_status(
     """检查绘本是否在书架中."""
     in_shelf = book_service.is_in_shelf(current_user["id"], book_id)
     return {"in_shelf": in_shelf}
+
+
+# ========================================
+# 页面管理 API（仅作者可操作）
+# ========================================
+
+
+@router.post("/{book_id}/pages", response_model=BookPageResponse)
+async def create_page(
+    book_id: str,
+    image: UploadFile = File(...),
+    page_number: int | None = None,
+    current_user: Annotated[dict, Depends(get_current_user)] = None,
+    book_service: Annotated[BookService, Depends(get_book_service)] = None,
+):
+    """创建新页面（仅作者可操作）。
+
+    Args:
+        book_id: 书籍 ID
+        image: 页面图片
+        page_number: 页码（可选，默认添加到最后）
+
+    Returns:
+        创建的页面信息
+    """
+    image_data = await image.read()
+    page = book_service.create_page(
+        book_id=book_id,
+        user_id=current_user["id"],
+        image_data=image_data,
+        page_number=page_number,
+    )
+    return BookPageResponse(**page)
+
+
+@router.delete("/{book_id}/pages/{page_number}", response_model=MessageResponse)
+async def delete_page(
+    book_id: str,
+    page_number: int,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    book_service: Annotated[BookService, Depends(get_book_service)],
+):
+    """删除页面（仅作者可操作）。
+
+    删除后会自动重新排序后续页面。
+
+    Args:
+        book_id: 书籍 ID
+        page_number: 页码
+    """
+    book_service.delete_page(book_id, current_user["id"], page_number)
+    return MessageResponse(message="页面已删除", success=True)

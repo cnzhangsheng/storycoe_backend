@@ -721,3 +721,122 @@ class BookService:
         ).first()
 
         return shelf_item is not None
+
+    def create_page(
+        self,
+        book_id: str,
+        user_id: str,
+        image_data: bytes,
+        page_number: int | None = None,
+    ) -> dict:
+        """创建新页面。
+
+        Args:
+            book_id: 书籍 ID
+            user_id: 用户 ID（用于权限校验）
+            image_data: 图片数据
+            page_number: 页码（可选，默认添加到最后）
+
+        Returns:
+            创建的页面数据
+
+        Raises:
+            NotFoundException: 书籍不存在或无权限
+        """
+        from app.services.file_storage_service import file_storage
+
+        # 校验书籍权限
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        if not book:
+            logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
+            raise NotFoundException(message="书籍未找到")
+
+        # 获取当前最大页码
+        max_page = self.db.query(BookPage).filter(BookPage.book_id == UUID(book_id)).count()
+
+        # 确定新页面页码
+        if page_number is None or page_number > max_page + 1:
+            page_number = max_page + 1
+        elif page_number < 1:
+            page_number = 1
+
+        # 如果插入中间位置，需要移动后续页面
+        if page_number <= max_page:
+            pages_to_shift = self.db.query(BookPage).filter(
+                BookPage.book_id == UUID(book_id),
+                BookPage.page_number >= page_number,
+            ).all()
+            for p in pages_to_shift:
+                p.page_number += 1
+            logger.info(f"移动页面: book_id={book_id}, 从第{page_number}页开始向后移动")
+
+        # 保存图片
+        relative_path = file_storage.save_page_image(
+            book_id=book_id,
+            page_number=page_number,
+            image_data=image_data,
+        )
+        image_url = f"/static/{relative_path}"
+
+        # 创建页面记录
+        page = BookPage(
+            book_id=UUID(book_id),
+            page_number=page_number,
+            image_url=image_url,
+        )
+        self.db.add(page)
+        self.db.commit()
+        self.db.refresh(page)
+
+        logger.info(f"创建页面: book_id={book_id}, page_number={page_number}")
+
+        return {
+            "id": str(page.id),
+            "book_id": str(page.book_id),
+            "page_number": page.page_number,
+            "image_url": page.image_url,
+            "created_at": page.created_at,
+        }
+
+    def delete_page(self, book_id: str, user_id: str, page_number: int) -> None:
+        """删除页面。
+
+        Args:
+            book_id: 书籍 ID
+            user_id: 用户 ID（用于权限校验）
+            page_number: 页码
+
+        Raises:
+            NotFoundException: 书籍或页面不存在
+        """
+        # 校验书籍权限
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        if not book:
+            logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
+            raise NotFoundException(message="书籍未找到")
+
+        # 查找页面
+        page = self.db.query(BookPage).filter(
+            BookPage.book_id == UUID(book_id),
+            BookPage.page_number == page_number,
+        ).first()
+
+        if not page:
+            logger.warning(f"页面不存在: book_id={book_id}, page_number={page_number}")
+            raise NotFoundException(message="页面未找到")
+
+        # 删除页面（关联的句子会级联删除）
+        self.db.delete(page)
+        self.db.commit()
+
+        # 重新排序后续页面
+        pages_to_shift = self.db.query(BookPage).filter(
+            BookPage.book_id == UUID(book_id),
+            BookPage.page_number > page_number,
+        ).order_by(BookPage.page_number).all()
+
+        for p in pages_to_shift:
+            p.page_number -= 1
+
+        self.db.commit()
+        logger.info(f"删除页面: book_id={book_id}, page_number={page_number}, 移动{len(pages_to_shift)}个后续页面")
