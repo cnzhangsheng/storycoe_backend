@@ -1,5 +1,6 @@
 """Book service using SQLAlchemy."""
 from typing import Optional
+from uuid import UUID
 
 from loguru import logger
 from sqlalchemy.orm import Session, joinedload
@@ -209,7 +210,7 @@ class BookService:
             NotFoundException: 书籍不存在或不属于该用户
         """
         # 先查询书籍（不限制用户）
-        book = self.db.query(Book).filter(Book.id == book_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id)).first()
 
         if not book:
             logger.warning(f"书籍不存在: book_id={book_id}")
@@ -320,7 +321,7 @@ class BookService:
             NotFoundException: 书籍或页面不存在
         """
         # 校验书籍权限（用户是所有者，或者书籍是公开的）
-        book = self.db.query(Book).filter(Book.id == book_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id)).first()
 
         if not book:
             raise NotFoundException(message="书籍未找到")
@@ -412,14 +413,14 @@ class BookService:
             NotFoundException: 书籍或句子不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
             raise NotFoundException(message="书籍未找到")
 
         # 查找句子
-        sentence = self.db.query(Sentence).filter(Sentence.id == sentence_id).first()
+        sentence = self.db.query(Sentence).filter(Sentence.id == UUID(sentence_id)).first()
 
         if not sentence:
             raise NotFoundException(message="句子未找到")
@@ -546,7 +547,7 @@ class BookService:
             NotFoundException: 书籍或页面不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
@@ -554,7 +555,7 @@ class BookService:
 
         # 获取页面
         page = self.db.query(BookPage).filter(
-            BookPage.book_id == book_id,
+            BookPage.book_id == UUID(book_id),
             BookPage.page_number == page_number,
         ).first()
 
@@ -565,7 +566,7 @@ class BookService:
         # 更新句子排序
         for index, sentence_id in enumerate(sentence_ids):
             sentence = self.db.query(Sentence).filter(
-                Sentence.id == sentence_id,
+                Sentence.id == UUID(sentence_id),
                 Sentence.page_id == page.id,
             ).first()
 
@@ -587,14 +588,14 @@ class BookService:
             NotFoundException: 书籍或句子不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
             raise NotFoundException(message="书籍未找到")
 
         # 查找句子
-        sentence = self.db.query(Sentence).filter(Sentence.id == sentence_id).first()
+        sentence = self.db.query(Sentence).filter(Sentence.id == UUID(sentence_id)).first()
 
         if not sentence:
             logger.warning(f"句子不存在: sentence_id={sentence_id}")
@@ -636,7 +637,7 @@ class BookService:
             NotFoundException: 书籍不存在或不公开
         """
         # 检查书籍是否存在且公开
-        book = self.db.query(Book).filter(Book.id == book_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id)).first()
         if not book:
             raise NotFoundException(message="书籍未找到")
 
@@ -647,7 +648,7 @@ class BookService:
         # 检查是否已在书架中
         existing = self.db.query(Bookshelf).filter(
             Bookshelf.user_id == user_id,
-            Bookshelf.book_id == book_id,
+            Bookshelf.book_id == UUID(book_id),
         ).first()
 
         if existing:
@@ -668,7 +669,7 @@ class BookService:
         """
         shelf_item = self.db.query(Bookshelf).filter(
             Bookshelf.user_id == user_id,
-            Bookshelf.book_id == book_id,
+            Bookshelf.book_id == UUID(book_id),
         ).first()
 
         if shelf_item:
@@ -687,14 +688,14 @@ class BookService:
             是否在书架中
         """
         # 如果是自己的书，返回 True
-        book = self.db.query(Book).filter(Book.id == book_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id)).first()
         if book and str(book.user_id) == str(user_id):
             return True
 
         # 检查书架
         shelf_item = self.db.query(Bookshelf).filter(
             Bookshelf.user_id == user_id,
-            Bookshelf.book_id == book_id,
+            Bookshelf.book_id == UUID(book_id),
         ).first()
 
         return shelf_item is not None
