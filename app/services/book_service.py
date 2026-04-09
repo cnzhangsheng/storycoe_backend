@@ -18,7 +18,7 @@ from app.models.schemas import (
     SentenceUpdate,
     SentenceCreateRequest,
 )
-from app.models.db_models import Book, BookPage, Sentence, Bookshelf
+from app.models.db_models import Book, BookPage, Sentence, Bookshelf, ReadingProgress
 from app.services.translation_service import translation_service
 
 
@@ -288,7 +288,7 @@ class BookService:
         return self.get_book(book_id, user_id)
 
     def delete_book(self, book_id: str, user_id: str) -> None:
-        """删除书籍。
+        """删除书籍及其所有关联数据。
 
         Args:
             book_id: 书籍 ID
@@ -297,14 +297,37 @@ class BookService:
         Raises:
             NotFoundException: 书籍不存在
         """
-        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
 
         if not book:
             raise NotFoundException(message="书籍未找到")
 
+        book_uuid = UUID(book_id)
+
+        # 1. 删除所有书架关联记录（其他人收藏的）
+        self.db.query(Bookshelf).filter(Bookshelf.book_id == book_uuid).delete()
+        logger.info(f"删除书架关联: book_id={book_id}")
+
+        # 2. 删除所有阅读进度记录
+        self.db.query(ReadingProgress).filter(ReadingProgress.book_id == book_uuid).delete()
+        logger.info(f"删除阅读进度: book_id={book_id}")
+
+        # 3. 获取所有页面 ID
+        page_ids = [p.id for p in self.db.query(BookPage.id).filter(BookPage.book_id == book_uuid).all()]
+
+        # 4. 删除所有句子
+        if page_ids:
+            self.db.query(Sentence).filter(Sentence.page_id.in_(page_ids)).delete(synchronize_session=False)
+            logger.info(f"删除句子: book_id={book_id}, pages={len(page_ids)}")
+
+        # 5. 删除所有页面
+        self.db.query(BookPage).filter(BookPage.book_id == book_uuid).delete()
+        logger.info(f"删除页面: book_id={book_id}")
+
+        # 6. 删除书籍本身
         self.db.delete(book)
         self.db.commit()
-        logger.info(f"删除书籍: book_id={book_id}, user_id={user_id}")
+        logger.info(f"删除书籍完成: book_id={book_id}, user_id={user_id}")
 
     def get_book_page(self, book_id: str, user_id: str, page_number: int) -> dict:
         """获取书籍页面详情。
