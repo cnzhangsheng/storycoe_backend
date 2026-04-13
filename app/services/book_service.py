@@ -176,6 +176,13 @@ class BookService:
             status="draft",
         )
         self.db.add(book)
+
+        # 更新用户创作绘本数（排行榜统计）
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.books_created += 1
+            logger.debug(f"更新用户创作数: user_id={user_id}, books_created={user.books_created}")
+
         self.db.commit()
         self.db.refresh(book)
 
@@ -327,6 +334,13 @@ class BookService:
 
         # 6. 删除书籍本身
         self.db.delete(book)
+
+        # 7. 更新用户创作绘本数（排行榜统计）
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if user and user.books_created > 0:
+            user.books_created -= 1
+            logger.debug(f"更新用户创作数: user_id={user_id}, books_created={user.books_created}")
+
         self.db.commit()
         logger.info(f"删除书籍完成: book_id={book_id}, user_id={user_id}")
 
@@ -681,6 +695,11 @@ class BookService:
         # 添加到书架
         shelf_item = Bookshelf(user_id=user_id, book_id=book_id)
         self.db.add(shelf_item)
+
+        # 更新绘本收藏数（排行榜统计）
+        book.shelf_count += 1
+        logger.debug(f"更新绘本收藏数: book_id={book_id}, shelf_count={book.shelf_count}")
+
         self.db.commit()
         logger.info(f"加入书架: user_id={user_id}, book_id={book_id}")
 
@@ -698,6 +717,13 @@ class BookService:
 
         if shelf_item:
             self.db.delete(shelf_item)
+
+            # 更新绘本收藏数（排行榜统计）
+            book = self.db.query(Book).filter(Book.id == UUID(book_id)).first()
+            if book and book.shelf_count > 0:
+                book.shelf_count -= 1
+                logger.debug(f"更新绘本收藏数: book_id={book_id}, shelf_count={book.shelf_count}")
+
             self.db.commit()
             logger.info(f"移出书架: user_id={user_id}, book_id={book_id}")
 

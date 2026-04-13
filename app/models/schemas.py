@@ -1,5 +1,5 @@
 """Pydantic models for API request/response schemas."""
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from uuid import UUID
 
@@ -425,3 +425,133 @@ class SystemConfigUpdate(BaseModel):
 # Update forward references
 BookPageDetailResponse.model_rebuild()
 BookDetailResponse.model_rebuild()
+
+
+# ============================================
+# Gamification Models (游戏化系统)
+# ============================================
+
+class AchievementResponse(BaseModel):
+    """成就响应模型。"""
+    id: UUID
+    code: str
+    name: str
+    description: str
+    icon: str
+    requirement_type: str
+    requirement_value: int
+    reward_stars: int
+    unlocked: bool = False  # 是否已解锁
+    unlocked_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AchievementListResponse(BaseModel):
+    """成就列表响应。"""
+    achievements: list[AchievementResponse]
+    total_unlocked: int
+    total: int
+
+
+class DailyTaskResponse(BaseModel):
+    """每日任务响应模型。"""
+    id: UUID
+    task_date: date
+    read_books: int
+    target_books: int = 3  # 目标绘本数
+    completed: bool
+    reward_claimed: bool
+    reward_stars: int = 20  # 完成奖励
+    progress_percent: float  # 进度百分比
+
+    class Config:
+        from_attributes = True
+
+
+class DailyTaskClaimResponse(BaseModel):
+    """领取每日任务奖励响应。"""
+    success: bool
+    reward_stars: int
+    message: str
+
+
+class GamificationStatsResponse(BaseModel):
+    """游戏化统计响应。"""
+    level: int
+    level_name: str
+    stars: int
+    streak: int
+    books_read: int
+    total_sentences_read: int
+    next_level_stars: int  # 下一等级需要星星
+    current_level_progress: float  # 当前等级进度百分比
+    title: str  # 身份标签
+
+
+class StarRewardResponse(BaseModel):
+    """星星奖励响应 - 用于记录星星获取。"""
+    stars_added: int
+    reason: str
+    total_stars: int
+    level_up: bool = False
+    new_level: Optional[int] = None
+    achievements_unlocked: list[AchievementResponse] = []
+
+
+class StreakUpdateResponse(BaseModel):
+    """连续天数更新响应。"""
+    streak: int
+    streak_started: bool = False
+    streak_continued: bool = False
+    streak_reset: bool = False
+    stars_added: int  # 连续打卡奖励星星
+
+
+# ============================================
+# Leaderboard Models (排行榜)
+# ============================================
+
+class LeaderboardBookResponse(BaseModel):
+    """排行榜绘本响应模型。"""
+    id: UUID
+    title: str
+    cover_image: Optional[str] = None
+    level: int
+    read_count: int
+    shelf_count: int
+    author_id: UUID
+    author_name: str
+    author_avatar: Optional[str] = None
+    rank: int
+
+    class Config:
+        from_attributes = True
+
+
+class LeaderboardAuthorResponse(BaseModel):
+    """排行榜作者响应模型。"""
+    id: UUID
+    name: str
+    avatar: Optional[str] = None
+    level: int
+    books_created: int  # 创作绘本数
+    total_shelf_count: int  # 作品被收藏总数
+    rank: int
+
+    class Config:
+        from_attributes = True
+
+
+class LeaderboardBookListResponse(BaseModel):
+    """排行榜绘本列表响应。"""
+    leaderboard_type: str  # hot / new
+    books: list[LeaderboardBookResponse]
+    total: int
+
+
+class LeaderboardAuthorListResponse(BaseModel):
+    """排行榜作者列表响应。"""
+    authors: list[LeaderboardAuthorResponse]
+    total: int

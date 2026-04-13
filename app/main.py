@@ -13,6 +13,8 @@ from app.core.logging import setup_logging, get_logger
 from app.core.database import init_db
 from app.api import auth_router, books_router, users_router, reading_router, ocr_router, generate_router
 from app.api.admin import router as admin_router
+from app.api.gamification import router as gamification_router
+from app.api.leaderboard import router as leaderboard_router
 
 # 配置日志
 setup_logging(settings.log_level)
@@ -34,6 +36,19 @@ async def lifespan(app: FastAPI):
     # 初始化数据库表
     logger.info("Initializing database...")
     init_db()
+
+    # 初始化游戏化成就数据
+    from app.core.database import SessionLocal
+    from app.services.gamification_service import GamificationService
+    db = SessionLocal()
+    try:
+        gamification_service = GamificationService(db)
+        gamification_service.init_default_achievements()
+        logger.info("游戏化成就数据初始化完成")
+    except Exception as e:
+        logger.warning(f"初始化成就数据失败（可能已存在）: {e}")
+    finally:
+        db.close()
 
     yield
     # Shutdown
@@ -113,6 +128,8 @@ app.include_router(reading_router)
 app.include_router(ocr_router)
 app.include_router(generate_router)
 app.include_router(admin_router)
+app.include_router(gamification_router)
+app.include_router(leaderboard_router)
 
 
 @app.get("/")
