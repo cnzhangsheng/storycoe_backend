@@ -273,28 +273,44 @@ async def get_leaderboard_summary(
                 "id": str(b.id),
                 "title": b.title,
                 "cover_image": b.cover_image,
+                "level": b.level,
                 "read_count": b.read_count,
+                "shelf_count": b.shelf_count,
+                "author_id": str(b.user_id),
                 "author_name": b.user.name if b.user else "未知",
+                "author_avatar": b.user.avatar if b.user else None,
+                "rank": rank + 1,
             }
-            for b in hot_books
+            for rank, b in enumerate(hot_books)
         ],
         "new_books": [
             {
                 "id": str(b.id),
                 "title": b.title,
                 "cover_image": b.cover_image,
-                "created_at": b.created_at.isoformat(),
+                "level": b.level,
+                "read_count": b.read_count,
+                "shelf_count": b.shelf_count,
+                "author_id": str(b.user_id),
                 "author_name": b.user.name if b.user else "未知",
+                "author_avatar": b.user.avatar if b.user else None,
+                "rank": rank + 1,
             }
-            for b in new_books
+            for rank, b in enumerate(new_books)
         ],
         "authors": [
             {
                 "id": str(a.id),
                 "name": a.name,
                 "avatar": a.avatar,
+                "level": a.level,
                 "books_created": a.books_created,
+                "total_shelf_count": db.query(func.sum(Book.shelf_count)).filter(
+                    Book.user_id == a.id,
+                    Book.share_type == "public",
+                ).scalar() or 0,
+                "rank": rank + 1,
             }
-            for a in authors
+            for rank, a in enumerate(authors)
         ],
     }
