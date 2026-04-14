@@ -497,3 +497,184 @@ async def update_config(
     db.commit()
 
     return MessageResponse(message="配置已更新")
+
+
+# ========================================
+# 排行榜管理
+# ========================================
+
+@router.get("/leaderboard/books")
+async def list_leaderboard_books(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    sort_by: str = Query("score", regex="^(score|read_count|shelf_count|created_at)$"),
+    admin: Annotated[dict, Depends(get_current_admin)] = None,
+    db: Session = Depends(get_db),
+):
+    """获取排行榜绘本列表（含统计数据）"""
+    query = db.query(Book).filter(
+        Book.share_type == "public",
+        Book.status == "completed",
+    )
+
+    # 搜索
+    if search:
+        query = query.filter(Book.title.ilike(f"%{search}%"))
+
+    # 统计总数
+    total = query.count()
+
+    # 排序
+    if sort_by == "score":
+        query = query.order_by(desc(Book.read_count + Book.shelf_count * 2))
+    elif sort_by == "read_count":
+        query = query.order_by(desc(Book.read_count))
+    elif sort_by == "shelf_count":
+        query = query.order_by(desc(Book.shelf_count))
+    else:
+        query = query.order_by(desc(Book.created_at))
+
+    # 分页
+    books = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "books": [
+            {
+                "id": str(book.id),
+                "title": book.title,
+                "cover_image": book.cover_image,
+                "level": book.level,
+                "read_count": book.read_count,
+                "shelf_count": book.shelf_count,
+                "score": book.read_count + book.shelf_count * 2,
+                "author_id": str(book.user_id),
+                "author_name": book.user.name if book.user else "未知",
+                "created_at": book.created_at.isoformat() if book.created_at else None,
+            }
+            for book in books
+        ],
+    }
+
+
+@router.get("/leaderboard/authors")
+async def list_leaderboard_authors(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    sort_by: str = Query("score", regex="^(score|books_created|stars|created_at)$"),
+    admin: Annotated[dict, Depends(get_current_admin)] = None,
+    db: Session = Depends(get_db),
+):
+    """获取排行榜作者列表（含统计数据）"""
+    query = db.query(User).filter(
+        User.is_active == True,
+        User.is_banned == False,
+    )
+
+    # 搜索
+    if search:
+        query = query.filter(User.name.ilike(f"%{search}%"))
+
+    # 统计总数
+    total = query.count()
+
+    # 子查询：计算每个用户的作品被收藏总数
+    shelf_count_subquery = (
+        db.query(
+            Book.user_id,
+            func.sum(Book.shelf_count).label("total_shelf_count"),
+        )
+        .filter(Book.share_type == "public")
+        .group_by(Book.user_id)
+        .subquery()
+    )
+
+    # 排序
+    if sort_by == "score":
+        query = query.order_by(desc(User.books_created))
+    elif sort_by == "books_created":
+        query = query.order_by(desc(User.books_created))
+    elif sort_by == "stars":
+        query = query.order_by(desc(User.stars))
+    else:
+        query = query.order_by(desc(User.created_at))
+
+    # 分页
+    users = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "authors": [
+            {
+                "id": str(user.id),
+                "name": user.name,
+                "avatar": user.avatar,
+                "level": user.level,
+                "books_created": user.books_created,
+                "stars": user.stars,
+                "streak": user.streak,
+                "total_shelf_count": db.query(func.sum(Book.shelf_count)).filter(
+                    Book.user_id == user.id,
+                    Book.share_type == "public",
+                ).scalar() or 0,
+                "score": user.books_created + (db.query(func.sum(Book.shelf_count)).filter(
+                    Book.user_id == user.id,
+                    Book.share_type == "public",
+                ).scalar() or 0) * 3,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+            }
+            for user in users
+        ],
+    }
+
+
+@router.put("/leaderboard/books/{book_id}/stats")
+async def update_book_leaderboard_stats(
+    book_id: str,
+    read_count: Optional[int] = None,
+    shelf_count: Optional[int] = None,
+    admin: Annotated[dict, Depends(get_current_admin)] = None,
+    db: Session = Depends(get_db),
+):
+    """更新绘本排行榜统计数据"""
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="绘本不存在")
+
+    if read_count is not None:
+        book.read_count = read_count
+    if shelf_count is not None:
+        book.shelf_count = shelf_count
+
+    db.commit()
+
+    return MessageResponse(message=f"绘本 '{book.title}' 统计数据已更新")
+
+
+@router.put("/leaderboard/users/{user_id}/stats")
+async def update_user_leaderboard_stats(
+    user_id: str,
+    books_created: Optional[int] = None,
+    stars: Optional[int] = None,
+    admin: Annotated[dict, Depends(get_current_admin)] = None,
+    db: Session = Depends(get_db),
+):
+    """更新用户排行榜统计数据"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    if books_created is not None:
+        user.books_created = books_created
+    if stars is not None:
+        user.stars = stars
+
+    db.commit()
+
+    return MessageResponse(message=f"用户 '{user.name}' 统计数据已更新")
