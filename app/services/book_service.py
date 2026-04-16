@@ -55,7 +55,7 @@ class BookService:
             分类书籍响应（我的绘本 + 喜欢的绘本）
         """
         # 1. 查询用户自己的所有绘本（不区分 private/public）
-        my_books_query = self.db.query(Book).filter(Book.user_id == user_id)
+        my_books_query = self.db.query(Book).filter(Book.user_id == UUID(user_id))
         if status:
             my_books_query = my_books_query.filter(Book.status == status)
         my_books = my_books_query.order_by(Book.created_at.desc()).all()
@@ -66,8 +66,8 @@ class BookService:
             self.db.query(Book)
             .join(Bookshelf, Book.id == Bookshelf.book_id)
             .filter(
-                Bookshelf.user_id == user_id,
-                Book.user_id != user_id,  # 排除自己的书
+                Bookshelf.user_id == UUID(user_id),
+                Book.user_id != UUID(user_id),  # 排除自己的书
                 Book.share_type == "public",  # 只有公开书籍
             )
         )
@@ -167,7 +167,7 @@ class BookService:
             创建的书籍数据
         """
         book = Book(
-            user_id=user_id,
+            user_id=UUID(user_id),
             title=book_data.title,
             level=book_data.level,
             cover_image=book_data.cover_image,
@@ -178,7 +178,7 @@ class BookService:
         self.db.add(book)
 
         # 更新用户创作绘本数（排行榜统计）
-        user = self.db.query(User).filter(User.id == user_id).first()
+        user = self.db.query(User).filter(User.id == UUID(user_id)).first()
         if user:
             user.books_created += 1
             logger.debug(f"更新用户创作数: user_id={user_id}, books_created={user.books_created}")
@@ -289,7 +289,7 @@ class BookService:
         Raises:
             NotFoundException: 书籍不存在
         """
-        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
 
         if not book:
             raise NotFoundException(message="书籍未找到")
@@ -319,7 +319,7 @@ class BookService:
         Raises:
             NotFoundException: 书籍不存在
         """
-        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
 
         if not book:
             raise NotFoundException(message="书籍未找到")
@@ -350,7 +350,7 @@ class BookService:
         self.db.delete(book)
 
         # 7. 更新用户创作绘本数（排行榜统计）
-        user = self.db.query(User).filter(User.id == user_id).first()
+        user = self.db.query(User).filter(User.id == UUID(user_id)).first()
         if user and user.books_created > 0:
             user.books_created -= 1
             logger.debug(f"更新用户创作数: user_id={user_id}, books_created={user.books_created}")
@@ -378,7 +378,7 @@ class BookService:
         if not book:
             raise NotFoundException(message="书籍未找到")
 
-        if book.user_id != user_id and book.share_type != "public":
+        if str(book.user_id) != user_id and book.share_type != "public":
             raise NotFoundException(message="书籍未找到")
 
         # 获取页面
@@ -431,7 +431,7 @@ class BookService:
 
         # 创建书籍记录
         book = Book(
-            user_id=user_id,
+            user_id=UUID(user_id),
             title=title,
             level=request.level,
             status="generating",
@@ -482,7 +482,7 @@ class BookService:
             NotFoundException: 书籍或句子不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
@@ -554,7 +554,7 @@ class BookService:
             NotFoundException: 书籍或页面不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == book_id, Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
@@ -615,7 +615,7 @@ class BookService:
             NotFoundException: 书籍或页面不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
@@ -656,7 +656,7 @@ class BookService:
             NotFoundException: 书籍或句子不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
 
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
@@ -715,7 +715,7 @@ class BookService:
 
         # 检查是否已在书架中
         existing = self.db.query(Bookshelf).filter(
-            Bookshelf.user_id == user_id,
+            Bookshelf.user_id == UUID(user_id),
             Bookshelf.book_id == UUID(book_id),
         ).first()
 
@@ -723,7 +723,7 @@ class BookService:
             return  # 已在书架中，静默返回
 
         # 添加到书架
-        shelf_item = Bookshelf(user_id=user_id, book_id=book_id)
+        shelf_item = Bookshelf(user_id=UUID(user_id), book_id=UUID(book_id))
         self.db.add(shelf_item)
 
         # 更新绘本收藏数（排行榜统计）
@@ -741,7 +741,7 @@ class BookService:
             book_id: 书籍 ID
         """
         shelf_item = self.db.query(Bookshelf).filter(
-            Bookshelf.user_id == user_id,
+            Bookshelf.user_id == UUID(user_id),
             Bookshelf.book_id == UUID(book_id),
         ).first()
 
@@ -774,7 +774,7 @@ class BookService:
 
         # 检查书架
         shelf_item = self.db.query(Bookshelf).filter(
-            Bookshelf.user_id == user_id,
+            Bookshelf.user_id == UUID(user_id),
             Bookshelf.book_id == UUID(book_id),
         ).first()
 
@@ -806,7 +806,7 @@ class BookService:
         from app.services.file_storage_service import file_storage
 
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
             raise NotFoundException(message="书籍未找到")
@@ -872,7 +872,7 @@ class BookService:
             NotFoundException: 书籍或页面不存在
         """
         # 校验书籍权限
-        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == user_id).first()
+        book = self.db.query(Book).filter(Book.id == UUID(book_id), Book.user_id == UUID(user_id)).first()
         if not book:
             logger.warning(f"书籍不存在或无权限: book_id={book_id}, user_id={user_id}")
             raise NotFoundException(message="书籍未找到")
