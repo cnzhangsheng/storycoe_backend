@@ -282,8 +282,10 @@ class TokenResponse(BaseModel):
 class GenerateBookRequest(BaseModel):
     """Request to generate book from images."""
     title: Optional[str] = Field(None, max_length=255)
-    images: list[str] = Field(..., min_length=1, max_length=50)
+    cover_image: Optional[str] = Field(None, description="封面图片URL（可选）")
+    images: list[str] = Field(..., min_length=1, max_length=50, description="内容图片URL列表")
     level: int = Field(default=1, ge=1, le=10)
+    share_type: str = Field(default="private", description="分享类型: public 或 private")
 
 
 class GenerateBookResponse(BaseModel):
@@ -291,6 +293,7 @@ class GenerateBookResponse(BaseModel):
     book_id: UUID
     status: str
     message: str
+    total_pages: Optional[int] = None
 
 
 # ============================================

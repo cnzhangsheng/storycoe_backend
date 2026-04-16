@@ -19,6 +19,73 @@ from app.models.db_models import Book, BookPage, Sentence
 router = APIRouter(prefix="/generate", tags=["Book Generation"])
 
 
+# ============================================
+# 图片上传接口
+# ============================================
+
+
+@router.post("/upload/image")
+async def upload_single_image(
+    image: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """上传单张图片，返回图片 URL。
+
+    用于小程序创作页面，先上传图片获取 URL，再调用生成绘本接口。
+
+    Args:
+        image: 图片文件
+
+    Returns:
+        {
+            "url": "/static/uploads/xxx.jpg",
+            "filename": "xxx.jpg"
+        }
+    """
+    user_id = current_user["id"]
+    logger.info(f"上传单张图片: user_id={user_id}, filename={image.filename}")
+
+    try:
+        # 读取图片数据
+        image_data = await image.read()
+        if not image_data:
+            raise HTTPException(status_code=400, detail="图片数据为空")
+
+        # 保存到临时目录
+        import uuid
+        import os
+        from app.core.config import settings
+
+        # 生成文件名
+        ext = os.path.splitext(image.filename)[1] or ".jpg"
+        filename = f"{uuid.uuid4().hex}{ext}"
+        relative_path = f"temp/{filename}"
+
+        # 确保目录存在
+        temp_dir = os.path.join(settings.upload_dir, "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # 保存文件
+        file_path = os.path.join(temp_dir, filename)
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+
+        url = f"/static/{relative_path}"
+        logger.info(f"图片上传成功: {url}")
+
+        return {
+            "url": url,
+            "filename": filename,
+            "size": len(image_data),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"上传图片失败: {e}")
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
+
+
 async def process_ocr_task(book_id: str, page_data_list: List[tuple]):
     """后台 OCR 处理任务。
 

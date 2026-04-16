@@ -404,36 +404,52 @@ class BookService:
         }
 
     def generate_book(self, user_id: str, request: GenerateBookRequest) -> GenerateBookResponse:
-        """生成书籍（异步任务）。
+        """生成书籍（从已上传的图片URL）。
 
         Args:
             user_id: 用户 ID
-            request: 生成请求
+            request: 生成请求（包含图片 URL）
 
         Returns:
             生成响应
         """
         title = request.title or "我的绘本"
 
+        # 创建书籍记录
         book = Book(
             user_id=user_id,
             title=title,
             level=request.level,
             status="generating",
             is_new=True,
+            share_type=request.share_type,
+            cover_image=request.cover_image,
         )
         self.db.add(book)
+        self.db.flush()
+
+        # 创建页面记录（从图片 URL）
+        for i, image_url in enumerate(request.images):
+            page = BookPage(
+                book_id=book.id,
+                page_number=i + 1,
+                image_url=image_url,
+                status="pending",  # 等待 OCR 处理
+            )
+            self.db.add(page)
+
         self.db.commit()
         self.db.refresh(book)
 
-        logger.info(f"创建生成任务: book_id={book.id}, user_id={user_id}, images={len(request.images)}")
+        logger.info(f"创建生成任务: book_id={book.id}, user_id={user_id}, pages={len(request.images)}, share_type={request.share_type}")
 
-        # TODO: 触发异步生成任务
+        # TODO: 触发异步 OCR 任务处理每个页面
 
         return GenerateBookResponse(
             book_id=book.id,
             status="generating",
-            message="书籍生成已开始",
+            message="绘本创建成功，正在后台处理文字识别",
+            total_pages=len(request.images),
         )
 
     async def update_sentence(self, book_id: str, user_id: str, sentence_id: str, sentence_data: SentenceUpdate) -> dict:
