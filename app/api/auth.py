@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from loguru import logger
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -57,20 +58,24 @@ async def wechat_login(
     通过微信 code 获取 openid，创建或获取用户，返回 JWT token。
     """
     # 微信小程序 AppID 和 AppSecret（需要配置）
-    appid = getattr(settings, 'wechat_appid', None)
-    secret = getattr(settings, 'wechat_secret', None)
+    appid = getattr(settings, 'wechat_appid', None) or getattr(settings, 'WECHAT_APPID', None)
+    secret = getattr(settings, 'wechat_secret', None) or getattr(settings, 'WECHAT_SECRET', None)
 
     # 如果没有配置微信 AppID/Secret，使用测试模式
     if not appid or not secret:
-        # 测试模式：创建测试用户
+        logger.info("[WechatLogin] 测试模式: 未配置微信 AppID/Secret")
         db = SessionLocal()
         try:
-            # 查找或创建测试用户
-            test_user = db.query(User).filter(User.phone == 'test_user').first()
+            # 生成测试 open_id
+            test_open_id = f"test_openid_{request.code[:8]}"
+
+            # 查找或创建测试用户（通过 wechat_open_id）
+            test_user = db.query(User).filter(User.wechat_open_id == test_open_id).first()
             if not test_user:
                 test_user = User(
                     id=uuid4(),
-                    phone='test_user',
+                    wechat_open_id=test_open_id,
+                    phone=None,
                     name='测试用户',
                     level=1,
                     books_read=0,
@@ -80,6 +85,9 @@ async def wechat_login(
                 db.add(test_user)
                 db.commit()
                 db.refresh(test_user)
+                logger.info(f"[WechatLogin] 创建测试用户: id={test_user.id}, open_id={test_open_id}")
+            else:
+                logger.info(f"[WechatLogin] 找到已有测试用户: id={test_user.id}, open_id={test_open_id}")
 
             # 生成 JWT token
             token = auth_service.create_access_token(str(test_user.id))
@@ -101,7 +109,8 @@ async def wechat_login(
         finally:
             db.close()
 
-    # 正常模式：调用微信 API
+    # 正常模式：调用微信 API 获取 open_id
+    logger.info(f"[WechatLogin] 正常模式: 调用微信 API, appid={appid}")
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             'https://api.weixin.qq.com/sns/jscode2session',
@@ -110,25 +119,32 @@ async def wechat_login(
                 'secret': secret,
                 'js_code': request.code,
                 'grant_type': 'authorization_code',
-            }
+            },
+            timeout=10.0,
         )
         data = resp.json()
+        logger.info(f"[WechatLogin] 微信 API 返回: {data}")
 
         if 'errcode' in data and data['errcode'] != 0:
+            logger.error(f"[WechatLogin] 微信 API 错误: {data}")
             raise AuthenticationException(
                 message=f"微信登录失败: {data.get('errmsg', '未知错误')}"
             )
 
         openid = data.get('openid')
+        if not openid:
+            logger.error(f"[WechatLogin] 未获取到 openid")
+            raise AuthenticationException(message="微信登录失败: 未获取到 openid")
 
-        # 查找或创建用户
+        # 查找或创建用户（通过 wechat_open_id）
         db = SessionLocal()
         try:
-            user = db.query(User).filter(User.phone == openid).first()
+            user = db.query(User).filter(User.wechat_open_id == openid).first()
             if not user:
                 user = User(
                     id=uuid4(),
-                    phone=openid,
+                    wechat_open_id=openid,
+                    phone=None,
                     name='微信用户',
                     level=1,
                     books_read=0,
@@ -138,9 +154,12 @@ async def wechat_login(
                 db.add(user)
                 db.commit()
                 db.refresh(user)
+                logger.info(f"[WechatLogin] 创建新用户: id={user.id}, open_id={openid}")
+            else:
+                logger.info(f"[WechatLogin] 找到已有用户: id={user.id}, open_id={openid}")
 
             # 生成 JWT token
-            token = auth_service.create_token(str(user.id))
+            token = auth_service.create_access_token(str(user.id))
 
             return WechatLoginResponse(
                 token=token,

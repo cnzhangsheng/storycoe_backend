@@ -15,6 +15,7 @@ class User(Base):
 
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     phone: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
+    wechat_open_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)  # 微信小程序 open_id
     name: Mapped[str] = mapped_column(String(100), default="小读者")
     avatar: Mapped[str | None] = mapped_column(String(500), nullable=True)
     level: Mapped[int] = mapped_column(Integer, default=1)
