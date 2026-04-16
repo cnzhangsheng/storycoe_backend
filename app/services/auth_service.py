@@ -185,11 +185,11 @@ class AuthService:
 
         return new_user
 
-    def get_current_user(self, user_id: str) -> dict:
+    def get_current_user(self, user_id: int) -> dict:
         """根据用户 ID 获取当前用户。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
 
         Returns:
             用户数据字典
@@ -204,7 +204,7 @@ class AuthService:
             raise AuthenticationException(message="用户不存在")
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name,
             "avatar": user.avatar,
             "phone": user.phone,

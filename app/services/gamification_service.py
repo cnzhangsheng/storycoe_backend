@@ -8,7 +8,6 @@
 - 每日任务：每日阅读任务和奖励
 """
 from datetime import datetime, date, timezone
-from uuid import UUID
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -312,7 +311,7 @@ class GamificationService:
 
         self.db.commit()
 
-    def get_all_achievements(self, user_id: UUID) -> AchievementListResponse:
+    def get_all_achievements(self, user_id: int) -> AchievementListResponse:
         """获取所有成就列表（包含用户解锁状态）。
 
         Args:

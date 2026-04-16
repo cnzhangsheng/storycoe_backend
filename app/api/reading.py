@@ -17,7 +17,7 @@ router = APIRouter(prefix="/reading", tags=["Reading Progress"])
 
 @router.get("/{book_id}", response_model=ReadingProgressResponse)
 async def get_reading_progress(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     reading_service: Annotated[ReadingService, Depends(get_reading_service)],
 ):
@@ -27,7 +27,7 @@ async def get_reading_progress(
 
 @router.put("/{book_id}", response_model=ReadingProgressResponse)
 async def update_reading_progress(
-    book_id: str,
+    book_id: int,
     update_data: ReadingProgressUpdate,
     current_user: Annotated[dict, Depends(get_current_user)],
     reading_service: Annotated[ReadingService, Depends(get_reading_service)],
@@ -43,7 +43,7 @@ async def update_reading_progress(
 
 @router.post("/{book_id}/complete", response_model=MessageResponse)
 async def mark_book_completed(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     reading_service: Annotated[ReadingService, Depends(get_reading_service)],
 ):

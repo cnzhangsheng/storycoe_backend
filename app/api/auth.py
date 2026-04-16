@@ -1,7 +1,6 @@
 """API routes for authentication."""
 import httpx
 from typing import Annotated
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -21,6 +20,7 @@ from app.models.schemas import (
 )
 from app.services import get_auth_service
 from app.services.auth_service import AuthService
+from app.utils.snowflake import snowflake_id
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
@@ -73,7 +73,6 @@ async def wechat_login(
             test_user = db.query(User).filter(User.wechat_open_id == test_open_id).first()
             if not test_user:
                 test_user = User(
-                    id=uuid4(),
                     wechat_open_id=test_open_id,
                     phone=None,
                     name='测试用户',
@@ -142,7 +141,6 @@ async def wechat_login(
             user = db.query(User).filter(User.wechat_open_id == openid).first()
             if not user:
                 user = User(
-                    id=uuid4(),
                     wechat_open_id=openid,
                     phone=None,
                     name='微信用户',

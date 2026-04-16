@@ -1,6 +1,5 @@
 """Reading progress service using SQLAlchemy."""
 from datetime import datetime, timezone, date
-from uuid import UUID
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -34,12 +33,12 @@ class ReadingService:
         """
         self.db = db
 
-    def get_reading_progress(self, user_id: str, book_id: str) -> ReadingProgressResponse:
+    def get_reading_progress(self, user_id: int, book_id: int) -> ReadingProgressResponse:
         """获取阅读进度。
 
         Args:
-            user_id: 用户 ID
-            book_id: 书籍 ID
+            user_id: 用户 ID（整数）
+            book_id: 书籍 ID（整数）
 
         Returns:
             阅读进度数据
@@ -78,16 +77,16 @@ class ReadingService:
 
     def update_reading_progress(
         self,
-        user_id: str,
-        book_id: str,
+        user_id: int,
+        book_id: int,
         update_data: ReadingProgressUpdate,
         current_books_read: int,
     ) -> ReadingProgressResponse:
         """更新阅读进度。
 
         Args:
-            user_id: 用户 ID
-            book_id: 书籍 ID
+            user_id: 用户 ID（整数）
+            book_id: 书籍 ID（整数）
             update_data: 更新数据
             current_books_read: 当前已读书籍数
 
@@ -149,12 +148,12 @@ class ReadingService:
             updated_at=progress.updated_at,
         )
 
-    def mark_book_completed(self, user_id: str, book_id: str, current_books_read: int) -> MessageResponse:
+    def mark_book_completed(self, user_id: int, book_id: int, current_books_read: int) -> MessageResponse:
         """标记书籍为已完成，并触发游戏化奖励。
 
         Args:
-            user_id: 用户 ID
-            book_id: 书籍 ID
+            user_id: 用户 ID（整数）
+            book_id: 书籍 ID（整数）
             current_books_read: 当前已读书籍数
 
         Returns:
@@ -218,11 +217,11 @@ class ReadingService:
 
         return MessageResponse(message=f"恭喜完成阅读！{reward_message}")
 
-    def _check_first_book_today(self, user_id: str, today: date) -> bool:
+    def _check_first_book_today(self, user_id: int, today: date) -> bool:
         """检查是否是今日第一本完成的绘本。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
             today: 今日日期
 
         Returns:

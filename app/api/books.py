@@ -82,7 +82,7 @@ async def create_book(
 
 @router.get("/{book_id}", response_model=BookDetailResponse)
 async def get_book(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
@@ -93,7 +93,7 @@ async def get_book(
 
 @router.put("/{book_id}", response_model=BookResponse)
 async def update_book(
-    book_id: str,
+    book_id: int,
     book_data: BookUpdate,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
@@ -105,7 +105,7 @@ async def update_book(
 
 @router.delete("/{book_id}")
 async def delete_book(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
@@ -116,7 +116,7 @@ async def delete_book(
 
 @router.get("/{book_id}/pages/{page_number}", response_model=BookPageDetailResponse)
 async def get_book_page(
-    book_id: str,
+    book_id: int,
     page_number: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
@@ -128,7 +128,7 @@ async def get_book_page(
 
 @router.post("/{book_id}/pages/{page_number}/sentences", response_model=SentenceResponse)
 async def create_sentence(
-    book_id: str,
+    book_id: int,
     page_number: int,
     sentence_data: SentenceCreateRequest,
     current_user: Annotated[dict, Depends(get_current_user)],
@@ -141,8 +141,8 @@ async def create_sentence(
 
 @router.put("/{book_id}/sentences/{sentence_id}", response_model=SentenceResponse)
 async def update_sentence(
-    book_id: str,
-    sentence_id: str,
+    book_id: int,
+    sentence_id: int,
     sentence_data: SentenceUpdate,
     background_tasks: BackgroundTasks,
     current_user: Annotated[dict, Depends(get_current_user)],
@@ -160,13 +160,12 @@ async def update_sentence(
         from app.core.database import SessionLocal
         from app.services.translation_service import translation_service
         from app.models.db_models import Sentence
-        from uuid import UUID
 
         async def do_translate():
             """后台翻译任务"""
             db = SessionLocal()
             try:
-                sentence_obj = db.query(Sentence).filter(Sentence.id == UUID(sentence_id)).first()
+                sentence_obj = db.query(Sentence).filter(Sentence.id == sentence_id).first()
                 if sentence_obj and sentence_obj.en:
                     new_zh = await translation_service.translate_sentence(sentence_obj.en)
                     if new_zh:
@@ -184,7 +183,7 @@ async def update_sentence(
 
 @router.put("/{book_id}/pages/{page_number}/sentences/reorder")
 async def reorder_sentences(
-    book_id: str,
+    book_id: int,
     page_number: int,
     request: SentenceReorderRequest,
     current_user: Annotated[dict, Depends(get_current_user)],
@@ -197,8 +196,8 @@ async def reorder_sentences(
 
 @router.delete("/{book_id}/sentences/{sentence_id}")
 async def delete_sentence(
-    book_id: str,
-    sentence_id: str,
+    book_id: int,
+    sentence_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
@@ -214,7 +213,7 @@ async def delete_sentence(
 
 @router.post("/{book_id}/shelf", response_model=MessageResponse)
 async def add_to_shelf(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
@@ -225,7 +224,7 @@ async def add_to_shelf(
 
 @router.delete("/{book_id}/shelf", response_model=MessageResponse)
 async def remove_from_shelf(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
@@ -236,7 +235,7 @@ async def remove_from_shelf(
 
 @router.get("/{book_id}/shelf-status")
 async def check_shelf_status(
-    book_id: str,
+    book_id: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
@@ -252,7 +251,7 @@ async def check_shelf_status(
 
 @router.post("/{book_id}/pages", response_model=BookPageResponse)
 async def create_page(
-    book_id: str,
+    book_id: int,
     background_tasks: BackgroundTasks,
     image: UploadFile = File(...),
     page_number: int | None = None,
@@ -294,7 +293,7 @@ async def create_page(
 
 @router.delete("/{book_id}/pages/{page_number}", response_model=MessageResponse)
 async def delete_page(
-    book_id: str,
+    book_id: int,
     page_number: int,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],

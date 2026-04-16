@@ -86,7 +86,7 @@ async def upload_single_image(
         raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
 
 
-async def process_ocr_task(book_id: str, page_data_list: List[tuple]):
+async def process_ocr_task(book_id: int, page_data_list: List[tuple]):
     """后台 OCR 处理任务。
 
     Args:
@@ -151,7 +151,7 @@ async def process_ocr_task(book_id: str, page_data_list: List[tuple]):
         db.close()
 
 
-async def process_single_page_ocr(page_id: str, image_data: bytes):
+async def process_single_page_ocr(page_id: int, image_data: bytes):
     """后台 OCR 处理单个页面。
 
     Args:
@@ -159,14 +159,13 @@ async def process_single_page_ocr(page_id: str, image_data: bytes):
         image_data: 图片数据
     """
     from app.core.database import SessionLocal
-    from uuid import UUID
 
     db = SessionLocal()
     try:
         logger.info(f"开始单页 OCR 任务: page_id={page_id}")
 
         # 获取页面
-        page = db.query(BookPage).filter(BookPage.id == UUID(page_id)).first()
+        page = db.query(BookPage).filter(BookPage.id == page_id).first()
         if not page:
             logger.error(f"页面不存在: page_id={page_id}")
             return
@@ -194,7 +193,7 @@ async def process_single_page_ocr(page_id: str, image_data: bytes):
         logger.error(f"单页 OCR 任务失败: page_id={page_id}, error={e}\n{traceback.format_exc()}")
         # 更新页面状态为错误
         try:
-            page = db.query(BookPage).filter(BookPage.id == UUID(page_id)).first()
+            page = db.query(BookPage).filter(BookPage.id == page_id).first()
             if page:
                 page.status = "error"
                 db.commit()

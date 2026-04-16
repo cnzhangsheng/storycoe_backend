@@ -7,7 +7,6 @@
 """
 from datetime import datetime, timezone, timedelta
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from loguru import logger
@@ -282,13 +281,13 @@ async def get_leaderboard_summary(
     return {
         "hot_books": [
             {
-                "id": str(b.id),
+                "id": b.id,
                 "title": b.title,
                 "cover_image": b.cover_image,
                 "level": b.level,
                 "read_count": b.read_count,
                 "shelf_count": b.shelf_count,
-                "author_id": str(b.user_id),
+                "author_id": b.user_id,
                 "author_name": b.user.name if b.user else "未知",
                 "author_avatar": b.user.avatar if b.user else None,
                 "rank": rank + 1,
@@ -297,13 +296,13 @@ async def get_leaderboard_summary(
         ],
         "new_books": [
             {
-                "id": str(b.id),
+                "id": b.id,
                 "title": b.title,
                 "cover_image": b.cover_image,
                 "level": b.level,
                 "read_count": b.read_count,
                 "shelf_count": b.shelf_count,
-                "author_id": str(b.user_id),
+                "author_id": b.user_id,
                 "author_name": b.user.name if b.user else "未知",
                 "author_avatar": b.user.avatar if b.user else None,
                 "rank": rank + 1,
@@ -312,7 +311,7 @@ async def get_leaderboard_summary(
         ],
         "authors": [
             {
-                "id": str(a.id),
+                "id": a.id,
                 "name": a.name,
                 "avatar": a.avatar,
                 "level": a.level,

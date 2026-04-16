@@ -1,7 +1,6 @@
 """Pydantic models for API request/response schemas."""
 from datetime import datetime, date
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +28,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     """User response model."""
-    id: UUID
+    id: int
     level: int = 1
     books_read: int = 0
     stars: int = 0
@@ -43,7 +42,7 @@ class UserResponse(UserBase):
 
 class UserStatsResponse(BaseModel):
     """User statistics response."""
-    user_id: UUID
+    user_id: int
     name: str
     level: int
     stars: int
@@ -73,8 +72,8 @@ class UserSettingsUpdate(BaseModel):
 
 class UserSettingsResponse(UserSettingsBase):
     """User settings response model."""
-    id: UUID
-    user_id: UUID
+    id: int
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -112,8 +111,8 @@ class BookUpdate(BaseModel):
 
 class BookResponse(BookBase):
     """Book response model."""
-    id: UUID
-    user_id: UUID
+    id: int
+    user_id: int
     progress: int = 0
     cover_image: Optional[str] = None
     is_new: bool = False
@@ -166,8 +165,8 @@ class BookPageCreate(BookPageBase):
 
 class BookPageResponse(BookPageBase):
     """Book page response model."""
-    id: UUID
-    book_id: UUID
+    id: int
+    book_id: int
     created_at: datetime
 
     class Config:
@@ -208,13 +207,13 @@ class SentenceCreateRequest(BaseModel):
 
 class SentenceReorderRequest(BaseModel):
     """Request to reorder sentences."""
-    sentence_ids: list[str] = Field(..., min_length=1)
+    sentence_ids: list[int] = Field(..., min_length=1)
 
 
 class SentenceResponse(SentenceBase):
     """Sentence response model."""
-    id: UUID
-    page_id: UUID
+    id: int
+    page_id: int
     sentence_order: int
     audio_url: Optional[str] = None
     created_at: datetime
@@ -241,9 +240,9 @@ class ReadingProgressUpdate(BaseModel):
 
 class ReadingProgressResponse(ReadingProgressBase):
     """Reading progress response model."""
-    id: UUID
-    user_id: UUID
-    book_id: UUID
+    id: int
+    user_id: int
+    book_id: int
     completed: bool = False
     last_read_at: datetime
     created_at: datetime
@@ -290,7 +289,7 @@ class GenerateBookRequest(BaseModel):
 
 class GenerateBookResponse(BaseModel):
     """Response for book generation."""
-    book_id: UUID
+    book_id: int
     status: str
     message: str
     total_pages: Optional[int] = None
@@ -331,7 +330,7 @@ class AdminTokenResponse(BaseModel):
 
 class AdminUserResponse(BaseModel):
     """Admin user response (for listing users)."""
-    id: UUID
+    id: int
     name: str
     phone: Optional[str] = None
     avatar: Optional[str] = None
@@ -365,36 +364,36 @@ class AdminBookListResponse(BaseModel):
     books: list[dict]
 
 
-class SentenceResponse(BaseModel):
+class AdminSentenceResponse(BaseModel):
     """Sentence response for admin."""
-    id: str
+    id: int
     sentence_order: int
     en: str
     zh: str
     audio_url: Optional[str] = None
 
 
-class BookPageResponse(BaseModel):
+class AdminBookPageResponse(BaseModel):
     """Book page response for admin."""
-    id: str
+    id: int
     page_number: int
     image_url: Optional[str] = None
-    sentences: list[SentenceResponse] = []
+    sentences: list[AdminSentenceResponse] = []
 
 
 class AdminBookDetailResponse(BaseModel):
     """Admin book detail response."""
-    id: str
+    id: int
     title: str
-    user_id: str
+    user_id: int
     user_name: Optional[str] = None
     status: str
     progress: int
     level: int
     has_audio: bool
     cover_image: Optional[str] = None
-    created_at: str
-    pages: list[BookPageResponse] = []
+    created_at: datetime
+    pages: list[AdminBookPageResponse] = []
 
 
 class AdminStatsOverviewResponse(BaseModel):
@@ -436,7 +435,7 @@ BookDetailResponse.model_rebuild()
 
 class AchievementResponse(BaseModel):
     """成就响应模型。"""
-    id: UUID
+    id: int
     code: str
     name: str
     description: str
@@ -460,7 +459,7 @@ class AchievementListResponse(BaseModel):
 
 class DailyTaskResponse(BaseModel):
     """每日任务响应模型。"""
-    id: UUID
+    id: int
     task_date: date
     read_books: int
     target_books: int = 3  # 目标绘本数
@@ -518,13 +517,13 @@ class StreakUpdateResponse(BaseModel):
 
 class LeaderboardBookResponse(BaseModel):
     """排行榜绘本响应模型。"""
-    id: UUID
+    id: int
     title: str
     cover_image: Optional[str] = None
     level: int
     read_count: int
     shelf_count: int
-    author_id: UUID
+    author_id: int
     author_name: str
     author_avatar: Optional[str] = None
     rank: int
@@ -535,7 +534,7 @@ class LeaderboardBookResponse(BaseModel):
 
 class LeaderboardAuthorResponse(BaseModel):
     """排行榜作者响应模型。"""
-    id: UUID
+    id: int
     name: str
     avatar: Optional[str] = None
     level: int
