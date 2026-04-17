@@ -2,7 +2,7 @@
 from datetime import datetime, date
 
 from sqlalchemy import Boolean, DateTime, Date, Integer, String, Text, BigInteger, func, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
 from app.core.database import Base
 from app.utils.snowflake import snowflake_id
@@ -31,12 +31,27 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # 关系（无外键约束，代码维护）
-    settings: Mapped["UserSettings"] = relationship("UserSettings", back_populates="user", uselist=False)
-    books: Mapped[list["Book"]] = relationship("Book", back_populates="user")
-    reading_progress: Mapped[list["ReadingProgress"]] = relationship("ReadingProgress", back_populates="user")
-    achievements: Mapped[list["UserAchievement"]] = relationship("UserAchievement", back_populates="user")
-    daily_tasks: Mapped[list["DailyTask"]] = relationship("DailyTask", back_populates="user")
+    # 关系（无数据库外键约束，使用 foreign() 显式指定逻辑关联）
+    settings: Mapped["UserSettings"] = relationship(
+        "UserSettings", back_populates="user", uselist=False,
+        primaryjoin="User.id == foreign(UserSettings.user_id)"
+    )
+    books: Mapped[list["Book"]] = relationship(
+        "Book", back_populates="user",
+        primaryjoin="User.id == foreign(Book.user_id)"
+    )
+    reading_progress: Mapped[list["ReadingProgress"]] = relationship(
+        "ReadingProgress", back_populates="user",
+        primaryjoin="User.id == foreign(ReadingProgress.user_id)"
+    )
+    achievements: Mapped[list["UserAchievement"]] = relationship(
+        "UserAchievement", back_populates="user",
+        primaryjoin="User.id == foreign(UserAchievement.user_id)"
+    )
+    daily_tasks: Mapped[list["DailyTask"]] = relationship(
+        "DailyTask", back_populates="user",
+        primaryjoin="User.id == foreign(DailyTask.user_id)"
+    )
 
 
 class UserSettings(Base):
@@ -52,7 +67,10 @@ class UserSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 关系
-    user: Mapped["User"] = relationship("User", back_populates="settings")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="settings",
+        primaryjoin="foreign(UserSettings.user_id) == User.id"
+    )
 
 
 class VerificationCode(Base):
@@ -87,9 +105,18 @@ class Book(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 关系
-    user: Mapped["User"] = relationship("User", back_populates="books")
-    pages: Mapped[list["BookPage"]] = relationship("BookPage", back_populates="book")
-    reading_progress: Mapped[list["ReadingProgress"]] = relationship("ReadingProgress", back_populates="book")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="books",
+        primaryjoin="foreign(Book.user_id) == User.id"
+    )
+    pages: Mapped[list["BookPage"]] = relationship(
+        "BookPage", back_populates="book",
+        primaryjoin="Book.id == foreign(BookPage.book_id)"
+    )
+    reading_progress: Mapped[list["ReadingProgress"]] = relationship(
+        "ReadingProgress", back_populates="book",
+        primaryjoin="Book.id == foreign(ReadingProgress.book_id)"
+    )
 
 
 class BookPage(Base):
@@ -104,8 +131,14 @@ class BookPage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 关系
-    book: Mapped["Book"] = relationship("Book", back_populates="pages")
-    sentences: Mapped[list["Sentence"]] = relationship("Sentence", back_populates="page")
+    book: Mapped["Book"] = relationship(
+        "Book", back_populates="pages",
+        primaryjoin="foreign(BookPage.book_id) == Book.id"
+    )
+    sentences: Mapped[list["Sentence"]] = relationship(
+        "Sentence", back_populates="page",
+        primaryjoin="BookPage.id == foreign(Sentence.page_id)"
+    )
 
 
 class Sentence(Base):
@@ -121,7 +154,10 @@ class Sentence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 关系
-    page: Mapped["BookPage"] = relationship("BookPage", back_populates="sentences")
+    page: Mapped["BookPage"] = relationship(
+        "BookPage", back_populates="sentences",
+        primaryjoin="foreign(Sentence.page_id) == BookPage.id"
+    )
 
 
 class ReadingProgress(Base):
@@ -139,8 +175,14 @@ class ReadingProgress(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 关系
-    user: Mapped["User"] = relationship("User", back_populates="reading_progress")
-    book: Mapped["Book"] = relationship("Book", back_populates="reading_progress")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="reading_progress",
+        primaryjoin="foreign(ReadingProgress.user_id) == User.id"
+    )
+    book: Mapped["Book"] = relationship(
+        "Book", back_populates="reading_progress",
+        primaryjoin="foreign(ReadingProgress.book_id) == Book.id"
+    )
 
 
 class Bookshelf(Base):
@@ -181,7 +223,10 @@ class Achievement(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 关系
-    user_achievements: Mapped[list["UserAchievement"]] = relationship("UserAchievement", back_populates="achievement")
+    user_achievements: Mapped[list["UserAchievement"]] = relationship(
+        "UserAchievement", back_populates="achievement",
+        primaryjoin="Achievement.id == foreign(UserAchievement.achievement_id)"
+    )
 
 
 class UserAchievement(Base):
@@ -195,8 +240,14 @@ class UserAchievement(Base):
     unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 关系
-    user: Mapped["User"] = relationship("User", back_populates="achievements")
-    achievement: Mapped["Achievement"] = relationship("Achievement", back_populates="user_achievements")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="achievements",
+        primaryjoin="foreign(UserAchievement.user_id) == User.id"
+    )
+    achievement: Mapped["Achievement"] = relationship(
+        "Achievement", back_populates="user_achievements",
+        primaryjoin="foreign(UserAchievement.achievement_id) == Achievement.id"
+    )
 
 
 class DailyTask(Base):
@@ -214,7 +265,10 @@ class DailyTask(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 关系
-    user: Mapped["User"] = relationship("User", back_populates="daily_tasks")
+    user: Mapped["User"] = relationship(
+        "User", back_populates="daily_tasks",
+        primaryjoin="foreign(DailyTask.user_id) == User.id"
+    )
 
 
 # 等级系统配置

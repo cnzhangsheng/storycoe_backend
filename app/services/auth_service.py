@@ -216,14 +216,14 @@ class AuthService:
             "updated_at": user.updated_at,
         }
 
-    def validate_token(self, token: str) -> str:
+    def validate_token(self, token: str) -> int:
         """验证 JWT 令牌并返回用户 ID。
 
         Args:
             token: JWT 令牌
 
         Returns:
-            用户 ID
+            用户 ID (int)
 
         Raises:
             AuthenticationException: 令牌无效
@@ -237,7 +237,7 @@ class AuthService:
             user_id: str = payload.get("sub")
             if user_id is None:
                 raise AuthenticationException(message="令牌无效")
-            return user_id
+            return int(user_id)
         except jwt.JWTError as e:
             logger.warning(f"JWT 解析失败: {e}")
             raise AuthenticationException(message="令牌无效或已过期")
