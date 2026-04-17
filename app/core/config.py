@@ -47,6 +47,10 @@ class Settings(BaseSettings):
         description="阿里百炼 API Key",
     )
 
+    # 微信小程序
+    wechat_appid: str | None = Field(None, description="微信小程序 AppID")
+    wechat_secret: str | None = Field(None, description="微信小程序 AppSecret")
+
     # CORS
     cors_origins: list[str] = ["*"]
 

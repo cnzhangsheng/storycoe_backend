@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import httpx
 from loguru import logger
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -241,3 +242,114 @@ class AuthService:
         except jwt.JWTError as e:
             logger.warning(f"JWT 解析失败: {e}")
             raise AuthenticationException(message="令牌无效或已过期")
+
+    async def wechat_login(self, code: str) -> dict:
+        """微信小程序登录。
+
+        Args:
+            code: 微信小程序 wx.login() 返回的 code
+
+        Returns:
+            用户信息和访问令牌
+
+        Raises:
+            AuthenticationException: 微信登录失败
+        """
+        if not settings.wechat_appid or not settings.wechat_secret:
+            logger.error("微信登录失败: 未配置 WECHAT_APPID 或 WECHAT_SECRET")
+            raise AuthenticationException(message="微信登录未配置，请检查服务器配置")
+
+        # 调用微信 API 获取 openid
+        logger.info(f"[WechatLogin] 调用微信 API, appid={settings.wechat_appid}")
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.weixin.qq.com/sns/jscode2session",
+                params={
+                    "appid": settings.wechat_appid,
+                    "secret": settings.wechat_secret,
+                    "js_code": code,
+                    "grant_type": "authorization_code",
+                },
+                timeout=10.0,
+            )
+            data = resp.json()
+
+        logger.info(f"[WechatLogin] 微信 API 返回: openid={data.get('openid')}, errcode={data.get('errcode')}")
+
+        # 检查微信 API 错误
+        if "errcode" in data and data["errcode"] != 0:
+            errmsg = data.get("errmsg", "未知错误")
+            logger.error(f"[WechatLogin] 微信 API 错误: errcode={data['errcode']}, errmsg={errmsg}")
+            raise AuthenticationException(message=f"微信登录失败: {errmsg}")
+
+        openid = data.get("openid")
+        if not openid:
+            logger.error("[WechatLogin] 未获取到 openid")
+            raise AuthenticationException(message="微信登录失败: 未获取到 openid")
+
+        # 查找或创建用户
+        user = self._find_or_create_user_by_wechat_openid(openid)
+
+        # 创建访问令牌
+        access_token = self.create_access_token(str(user.id))
+
+        logger.info(f"[WechatLogin] 用户登录成功: user_id={user.id}, openid={openid}")
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": UserResponse(
+                id=user.id,
+                name=user.name,
+                avatar=user.avatar,
+                level=user.level,
+                books_read=user.books_read,
+                stars=user.stars,
+                streak=user.streak,
+                created_at=user.created_at,
+                updated_at=user.updated_at,
+            ),
+        }
+
+    def _find_or_create_user_by_wechat_openid(self, openid: str) -> User:
+        """根据微信 openid 查找或创建用户。
+
+        Args:
+            openid: 微信用户唯一标识
+
+        Returns:
+            用户对象
+        """
+        user = self.db.query(User).filter(User.wechat_open_id == openid).first()
+
+        if user:
+            logger.debug(f"[WechatLogin] 找到已有用户: user_id={user.id}")
+            return user
+
+        # 创建新用户
+        new_user = User(
+            wechat_open_id=openid,
+            phone=None,
+            name="微信用户",
+            level=1,
+            books_read=0,
+            stars=0,
+            streak=0,
+        )
+        self.db.add(new_user)
+        self.db.flush()
+
+        logger.info(f"[WechatLogin] 创建新用户: user_id={new_user.id}, openid={openid}")
+
+        # 创建默认用户设置
+        user_settings = UserSettings(
+            user_id=new_user.id,
+            speed_label="中",
+            accent="US",
+            loop_enabled=False,
+        )
+        self.db.add(user_settings)
+        self.db.commit()
+        logger.debug(f"[WechatLogin] 创建用户默认设置: user_id={new_user.id}")
+
+        return new_user
