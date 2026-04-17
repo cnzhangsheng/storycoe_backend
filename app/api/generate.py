@@ -116,9 +116,16 @@ async def process_ocr_task(book_id: int, page_data_list: List[tuple]):
         ]
         ocr_results: List[List[OcrSentence]] = await asyncio.gather(*ocr_tasks)
 
-        # 保存所有句子
+        # 保存所有句子并更新页面状态
         for idx, (page_id, _) in enumerate(page_data_list):
             sentences = ocr_results[idx]
+
+            # 更新页面状态
+            page = db.query(BookPage).filter(BookPage.id == page_id).first()
+            if page:
+                page.status = "completed"
+
+            # 保存句子
             for j, sentence in enumerate(sentences):
                 sentence_record = Sentence(
                     page_id=page_id,

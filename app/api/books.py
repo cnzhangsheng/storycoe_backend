@@ -112,8 +112,14 @@ async def process_generate_ocr_task(book_id: int, image_urls: list[str]):
         ]
         ocr_results = await asyncio.gather(*ocr_tasks)
 
-        # 保存句子
+        # 保存句子并更新页面状态
         for page_id, sentences in zip([p[0] for p in page_data_list], ocr_results):
+            # 更新页面状态
+            page = db.query(BookPage).filter(BookPage.id == page_id).first()
+            if page:
+                page.status = "completed"
+
+            # 保存句子
             for j, sentence in enumerate(sentences):
                 sentence_record = Sentence(
                     page_id=page_id,
