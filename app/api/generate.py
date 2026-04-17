@@ -249,7 +249,7 @@ async def generate_book(
         )
         db.add(book)
         db.flush()
-        book_id = str(book.id)
+        book_id = book.id  # 保持整数类型
         logger.info(f"创建书籍记录: book_id={book_id}")
 
         # 步骤2: 创建书籍目录
@@ -296,7 +296,7 @@ async def generate_book(
             db.add(page)
             db.flush()
 
-            page_data_list.append((str(page.id), image_data))
+            page_data_list.append((page.id, image_data))
             logger.debug(f"保存图片 {i+1} 成功: {relative_path}")
 
         if not page_data_list:
@@ -375,7 +375,7 @@ async def generate_book_sync(
             )
             db.add(book)
             db.flush()
-            book_id = str(book.id)
+            book_id = book.id
 
             file_storage.create_book_dir(book_id)
 

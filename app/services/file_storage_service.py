@@ -40,11 +40,11 @@ class FileStorageService:
         self.avatars_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"文件存储目录: {self.base_dir.absolute()}")
 
-    def create_book_dir(self, book_id: str) -> Path:
+    def create_book_dir(self, book_id: int) -> Path:
         """创建书籍目录。
 
         Args:
-            book_id: 书籍 ID
+            book_id: 书籍 ID（整数）
 
         Returns:
             书籍目录路径
@@ -57,7 +57,7 @@ class FileStorageService:
 
     def save_page_image(
         self,
-        book_id: str,
+        book_id: int,
         page_number: int,
         image_data: bytes,
         extension: str = "jpg",
@@ -65,7 +65,7 @@ class FileStorageService:
         """保存页面图片。
 
         Args:
-            book_id: 书籍 ID
+            book_id: 书籍 ID（整数）
             page_number: 页码
             image_data: 图片字节数据
             extension: 图片扩展名
@@ -98,14 +98,14 @@ class FileStorageService:
 
     def save_cover_image(
         self,
-        book_id: str,
+        book_id: int,
         image_data: bytes,
         extension: str = "jpg",
     ) -> str:
         """保存封面图片。
 
         Args:
-            book_id: 书籍 ID
+            book_id: 书籍 ID（整数）
             image_data: 图片字节数据
             extension: 图片扩展名
 
@@ -142,11 +142,11 @@ class FileStorageService:
         """
         return self.base_dir / relative_path
 
-    def get_page_url(self, book_id: str, page_number: int, extension: str = "jpg") -> str:
+    def get_page_url(self, book_id: int, page_number: int, extension: str = "jpg") -> str:
         """获取页面图片 URL。
 
         Args:
-            book_id: 书籍 ID
+            book_id: 书籍 ID（整数）
             page_number: 页码
             extension: 图片扩展名
 
@@ -155,11 +155,11 @@ class FileStorageService:
         """
         return f"/static/books/{book_id}/pages/page_{page_number:03d}.{extension}"
 
-    def delete_book_dir(self, book_id: str) -> bool:
+    def delete_book_dir(self, book_id: int) -> bool:
         """删除书籍目录。
 
         Args:
-            book_id: 书籍 ID
+            book_id: 书籍 ID（整数）
 
         Returns:
             是否成功
@@ -175,14 +175,14 @@ class FileStorageService:
 
     def save_avatar(
         self,
-        user_id: str,
+        user_id: int,
         image_data: bytes,
         extension: str = "jpg",
     ) -> str:
         """保存用户头像。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
             image_data: 图片字节数据
             extension: 图片扩展名
 

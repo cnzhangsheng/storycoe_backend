@@ -30,11 +30,11 @@ class UserService:
         """
         self.db = db
 
-    def get_user(self, user_id: str) -> dict:
+    def get_user(self, user_id: int) -> dict:
         """获取用户信息。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
 
         Returns:
             用户数据字典
@@ -49,7 +49,7 @@ class UserService:
             raise NotFoundException(message="用户未找到")
 
         return {
-            "id": str(user.id),
+            "id": user.id,
             "name": user.name,
             "avatar": user.avatar,
             "phone": user.phone,
@@ -61,11 +61,11 @@ class UserService:
             "updated_at": user.updated_at,
         }
 
-    def update_user(self, user_id: str, update_data: UserUpdate) -> dict:
+    def update_user(self, user_id: int, update_data: UserUpdate) -> dict:
         """更新用户信息。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
             update_data: 更新数据
 
         Returns:
@@ -91,11 +91,11 @@ class UserService:
 
         return self.get_user(user_id)
 
-    def get_user_settings(self, user_id: str) -> dict:
+    def get_user_settings(self, user_id: int) -> dict:
         """获取用户设置。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
 
         Returns:
             用户设置数据字典
@@ -110,8 +110,8 @@ class UserService:
             raise NotFoundException(message="用户设置未找到")
 
         return {
-            "id": str(settings.id),
-            "user_id": str(settings.user_id),
+            "id": settings.id,
+            "user_id": settings.user_id,
             "speed_label": settings.speed_label,
             "accent": settings.accent,
             "loop_enabled": settings.loop_enabled,
@@ -119,11 +119,11 @@ class UserService:
             "updated_at": settings.updated_at,
         }
 
-    def update_user_settings(self, user_id: str, update_data: UserSettingsUpdate) -> dict:
+    def update_user_settings(self, user_id: int, update_data: UserSettingsUpdate) -> dict:
         """更新用户设置。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
             update_data: 更新数据
 
         Returns:
@@ -149,11 +149,11 @@ class UserService:
 
         return self.get_user_settings(user_id)
 
-    def get_user_stats(self, user_id: str) -> UserStatsResponse:
+    def get_user_stats(self, user_id: int) -> UserStatsResponse:
         """获取用户统计数据。
 
         Args:
-            user_id: 用户 ID
+            user_id: 用户 ID（整数）
 
         Returns:
             用户统计数据

@@ -587,7 +587,7 @@ class BookService:
                 p.page_number += 1
 
         relative_path = file_storage.save_page_image(
-            book_id=str(book_id),
+            book_id=book_id,
             page_number=page_number,
             image_data=image_data,
         )

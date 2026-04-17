@@ -144,7 +144,7 @@ async def list_users(
 
 @router.get("/users/{user_id}", response_model=AdminUserResponse)
 async def get_user_detail(
-    user_id: str,
+    user_id: int,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -158,7 +158,7 @@ async def get_user_detail(
 
 @router.put("/users/{user_id}/ban", response_model=MessageResponse)
 async def ban_user(
-    user_id: str,
+    user_id: int,
     request: AdminBanRequest,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
@@ -177,7 +177,7 @@ async def ban_user(
 
 @router.put("/users/{user_id}/unban", response_model=MessageResponse)
 async def unban_user(
-    user_id: str,
+    user_id: int,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -195,7 +195,7 @@ async def unban_user(
 
 @router.delete("/users/{user_id}", response_model=MessageResponse)
 async def delete_user(
-    user_id: str,
+    user_id: int,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -246,9 +246,9 @@ async def list_books(
         page_size=page_size,
         books=[
             {
-                "id": str(book.id),
+                "id": book.id,
                 "title": book.title,
-                "user_id": str(book.user_id),
+                "user_id": book.user_id,
                 "user_name": book.user.name if book.user else None,
                 "status": book.status,
                 "progress": book.progress,
@@ -261,7 +261,7 @@ async def list_books(
 
 @router.get("/books/{book_id}", response_model=AdminBookDetailResponse)
 async def get_book_detail(
-    book_id: str,
+    book_id: int,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -276,7 +276,7 @@ async def get_book_detail(
         sentences_data = []
         for sentence in (page.sentences or []):
             sentences_data.append({
-                "id": str(sentence.id),
+                "id": sentence.id,
                 "sentence_order": sentence.sentence_order,
                 "en": sentence.en,
                 "zh": sentence.zh,
@@ -284,16 +284,16 @@ async def get_book_detail(
             })
 
         pages_data.append({
-            "id": str(page.id),
+            "id": page.id,
             "page_number": page.page_number,
             "image_url": page.image_url,
             "sentences": sentences_data,
         })
 
     return AdminBookDetailResponse(
-        id=str(book.id),
+        id=book.id,
         title=book.title,
-        user_id=str(book.user_id),
+        user_id=book.user_id,
         user_name=book.user.name if book.user else None,
         status=book.status,
         progress=book.progress,
@@ -307,8 +307,8 @@ async def get_book_detail(
 
 @router.put("/books/{book_id}/status", response_model=MessageResponse)
 async def update_book_status(
-    book_id: str,
-    status: str = Query(..., regex="^(completed|error|draft)$"),
+    book_id: int,
+    status: str = Query(..., pattern="^(completed|error|draft)$"),
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -325,7 +325,7 @@ async def update_book_status(
 
 @router.delete("/books/{book_id}", response_model=MessageResponse)
 async def delete_book(
-    book_id: str,
+    book_id: int,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -508,7 +508,7 @@ async def list_leaderboard_books(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
-    sort_by: str = Query("score", regex="^(score|read_count|shelf_count|created_at)$"),
+    sort_by: str = Query("score", pattern="^(score|read_count|shelf_count|created_at)$"),
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -544,14 +544,14 @@ async def list_leaderboard_books(
         "page_size": page_size,
         "books": [
             {
-                "id": str(book.id),
+                "id": book.id,
                 "title": book.title,
                 "cover_image": book.cover_image,
                 "level": book.level,
                 "read_count": book.read_count,
                 "shelf_count": book.shelf_count,
                 "score": book.read_count + book.shelf_count * 2,
-                "author_id": str(book.user_id),
+                "author_id": book.user_id,
                 "author_name": book.user.name if book.user else "未知",
                 "created_at": book.created_at.isoformat() if book.created_at else None,
             }
@@ -565,7 +565,7 @@ async def list_leaderboard_authors(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
-    sort_by: str = Query("score", regex="^(score|books_created|stars|created_at)$"),
+    sort_by: str = Query("score", pattern="^(score|books_created|stars|created_at)$"),
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -612,7 +612,7 @@ async def list_leaderboard_authors(
         "page_size": page_size,
         "authors": [
             {
-                "id": str(user.id),
+                "id": user.id,
                 "name": user.name,
                 "avatar": user.avatar,
                 "level": user.level,
@@ -636,7 +636,7 @@ async def list_leaderboard_authors(
 
 @router.put("/leaderboard/books/{book_id}/stats")
 async def update_book_leaderboard_stats(
-    book_id: str,
+    book_id: int,
     read_count: Optional[int] = None,
     shelf_count: Optional[int] = None,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
@@ -659,7 +659,7 @@ async def update_book_leaderboard_stats(
 
 @router.put("/leaderboard/users/{user_id}/stats")
 async def update_user_leaderboard_stats(
-    user_id: str,
+    user_id: int,
     books_created: Optional[int] = None,
     stars: Optional[int] = None,
     admin: Annotated[dict, Depends(get_current_admin)] = None,
