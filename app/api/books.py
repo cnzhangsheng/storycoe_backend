@@ -1,9 +1,13 @@
 """API routes for books."""
+import asyncio
+import traceback
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
+from loguru import logger
 
 from app.api.auth import get_current_user
+from app.models.db_models import Sentence
 from app.models.schemas import (
     BookCreate,
     BookUpdate,
@@ -30,11 +34,114 @@ router = APIRouter(prefix="/books", tags=["Books"])
 @router.post("/generate", response_model=GenerateBookResponse)
 async def generate_book(
     request: GenerateBookRequest,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
     """Generate a book from images (async task)."""
-    return book_service.generate_book(current_user["id"], request)
+    result = book_service.generate_book(current_user["id"], request)
+
+    # 启动后台 OCR 任务（下载图片并识别）
+    background_tasks.add_task(
+        process_generate_ocr_task,
+        result.book_id,
+        request.images,
+    )
+
+    return result
+
+
+async def process_generate_ocr_task(book_id: int, image_urls: list[str]):
+    """后台 OCR 处理任务（从 URL 下载图片）。
+
+    Args:
+        book_id: 书籍 ID
+        image_urls: 图片 URL 列表
+    """
+    import httpx
+    from app.core.database import SessionLocal
+    from app.models.db_models import Book, BookPage
+    from app.services.ocr_service import ocr_service
+
+    db = SessionLocal()
+    try:
+        logger.info(f"[GenerateOCR] 开始后台任务: book_id={book_id}, pages={len(image_urls)}")
+
+        book = db.query(Book).filter(Book.id == book_id).first()
+        if not book:
+            logger.error(f"[GenerateOCR] 书籍不存在: book_id={book_id}")
+            return
+
+        book.status = "processing"
+        db.commit()
+
+        # 下载所有图片
+        page_data_list = []
+        pages = db.query(BookPage).filter(BookPage.book_id == book_id).order_by(BookPage.page_number).all()
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            for page, url in zip(pages, image_urls):
+                try:
+                    # 处理相对 URL
+                    if url.startswith("/static/"):
+                        # 本地文件，直接读取
+                        from app.core.config import settings
+                        file_path = url.replace("/static/", settings.upload_dir + "/")
+                        with open(file_path, "rb") as f:
+                            image_data = f.read()
+                    else:
+                        # 远程 URL，下载
+                        resp = await client.get(url)
+                        image_data = resp.content
+
+                    page_data_list.append((page.id, image_data))
+                    logger.debug(f"[GenerateOCR] 下载图片成功: page_id={page.id}, size={len(image_data)}")
+                except Exception as e:
+                    logger.warning(f"[GenerateOCR] 下载图片失败: url={url}, error={e}")
+
+        if not page_data_list:
+            book.status = "error"
+            db.commit()
+            logger.error(f"[GenerateOCR] 没有有效图片")
+            return
+
+        # 并行 OCR 识别
+        ocr_tasks = [
+            ocr_service.recognize_image(image_data)
+            for _, image_data in page_data_list
+        ]
+        ocr_results = await asyncio.gather(*ocr_tasks)
+
+        # 保存句子
+        for page_id, sentences in zip([p[0] for p in page_data_list], ocr_results):
+            for j, sentence in enumerate(sentences):
+                sentence_record = Sentence(
+                    page_id=page_id,
+                    sentence_order=j + 1,
+                    en=sentence.en,
+                    zh=sentence.zh,
+                )
+                db.add(sentence_record)
+
+        db.commit()
+
+        book.status = "completed"
+        book.has_audio = True
+        db.commit()
+
+        logger.info(f"[GenerateOCR] 后台任务完成: book_id={book_id}")
+
+    except Exception as e:
+        logger.error(f"[GenerateOCR] 后台任务失败: book_id={book_id}, error={e}\n{traceback.format_exc()}")
+        try:
+            book = db.query(Book).filter(Book.id == book_id).first()
+            if book:
+                book.status = "error"
+                db.commit()
+        except:
+            pass
+    finally:
+        db.close()
 
 
 @router.get("", response_model=ShelfListResponse)
