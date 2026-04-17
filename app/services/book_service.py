@@ -39,28 +39,23 @@ class BookService:
         user_id: int,
         page: int = 1,
         page_size: int = 20,
-        status: Optional[str] = None,
     ) -> ShelfListResponse:
         """获取绘本架分类列表。
 
         Args:
-            user_id: 用户 ID（整数）
-            page: 页码
-            page_size: 每页数量
-            status: 状态筛选
+            user_id: 用户 ID
+            page: 页码（暂未使用）
+            page_size: 每页数量（暂未使用）
 
         Returns:
-            分类书籍响应（我的绘本 + 喜欢的绘本）
+            分类书籍响应（我的绘本架 + 喜欢的绘本）
         """
-        # 1. 查询用户自己的所有绘本
-        my_books_query = self.db.query(Book).filter(Book.user_id == user_id)
-        if status:
-            my_books_query = my_books_query.filter(Book.status == status)
-        my_books = my_books_query.order_by(Book.created_at.desc()).all()
+        # 1. 我的绘本架：查询用户创作的所有绘本（不区分状态）
+        my_books = self.db.query(Book).filter(Book.user_id == user_id).order_by(Book.created_at.desc()).all()
         total_my = len(my_books)
 
-        # 2. 查询喜欢的绘本（书架中其他人的 public 书籍）
-        liked_books_query = (
+        # 2. 喜欢的绘本：查询用户收藏的绘本（书架中其他人的公开书籍）
+        liked_books = (
             self.db.query(Book)
             .join(Bookshelf, Book.id == Bookshelf.book_id)
             .filter(
@@ -68,10 +63,9 @@ class BookService:
                 Book.user_id != user_id,
                 Book.share_type == "public",
             )
+            .order_by(Bookshelf.created_at.desc())
+            .all()
         )
-        if status:
-            liked_books_query = liked_books_query.filter(Book.status == status)
-        liked_books = liked_books_query.order_by(Book.created_at.desc()).all()
         total_liked = len(liked_books)
 
         logger.debug(f"获取绘本架: user_id={user_id}, my_books={total_my}, liked_books={total_liked}")

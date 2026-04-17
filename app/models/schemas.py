@@ -141,8 +141,8 @@ class BookListResponse(BaseModel):
 
 class ShelfListResponse(BaseModel):
     """绘本架分类响应."""
-    my_books: list[BookResponse]  # 用户自己的所有绘本
-    liked_books: list[BookResponse]  # 喜欢的他人公开绘本
+    my_books: list[BookResponse]  # 我的绘本架：我创作的绘本
+    liked_books: list[BookResponse]  # 喜欢的绘本：我收藏的绘本
     total_my: int
     total_liked: int
 

@@ -39,19 +39,11 @@ async def generate_book(
 
 @router.get("", response_model=ShelfListResponse)
 async def list_books(
-    page: int = 1,
-    page_size: int = 20,
-    status: str | None = None,
-    current_user: Annotated[dict, Depends(get_current_user)] = None,
-    book_service: Annotated[BookService, Depends(get_book_service)] = None,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    book_service: Annotated[BookService, Depends(get_book_service)],
 ):
-    """获取绘本架分类列表（我的绘本 + 喜欢的绘本）."""
-    return book_service.list_books(
-        user_id=current_user["id"],
-        page=page,
-        page_size=page_size,
-        status=status,
-    )
+    """获取绘本架分类列表（我的绘本架 + 喜欢的绘本）."""
+    return book_service.list_books(user_id=current_user["id"])
 
 
 @router.get("/public", response_model=BookListResponse)
