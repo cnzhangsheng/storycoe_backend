@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.db_models import User, Book, SystemConfig, ReadingProgress, UserRole
+from app.models.db_models import User, Book, SystemConfig, ReadingProgress, UserRole, Bookshelf, BookPage, Sentence
 from app.models.schemas import (
     MessageResponse,
     AdminLoginRequest,
@@ -408,11 +408,29 @@ async def delete_book(
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
-    """删除绘本"""
+    """删除绘本（级联删除关联数据）"""
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="绘本不存在")
 
+    # 级联删除关联数据
+    # 1. 删除书架收藏记录
+    db.query(Bookshelf).filter(Bookshelf.book_id == book_id).delete()
+
+    # 2. 删除阅读进度
+    db.query(ReadingProgress).filter(ReadingProgress.book_id == book_id).delete()
+
+    # 3. 获取所有页面ID
+    page_ids = [p.id for p in db.query(BookPage).filter(BookPage.book_id == book_id).all()]
+
+    # 4. 删除所有句子
+    if page_ids:
+        db.query(Sentence).filter(Sentence.page_id.in_(page_ids)).delete(synchronize_session=False)
+
+    # 5. 删除所有页面
+    db.query(BookPage).filter(BookPage.book_id == book_id).delete()
+
+    # 6. 删除绘本
     db.delete(book)
     db.commit()
 
