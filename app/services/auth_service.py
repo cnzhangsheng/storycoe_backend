@@ -124,6 +124,10 @@ class AuthService:
         # 查找或创建用户
         user = self._find_or_create_user(phone)
 
+        # 更新最后登录时间
+        user.last_login_at = utcnow()
+        self.db.commit()
+
         # 创建访问令牌
         access_token = self.create_access_token(str(user.id))
 
@@ -289,6 +293,10 @@ class AuthService:
 
         # 查找或创建用户
         user = self._find_or_create_user_by_wechat_openid(openid)
+
+        # 更新最后登录时间
+        user.last_login_at = utcnow()
+        self.db.commit()
 
         # 创建访问令牌
         access_token = self.create_access_token(str(user.id))
