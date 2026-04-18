@@ -271,6 +271,7 @@ async def list_books(
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    share_type: Optional[str] = Query(None, pattern="^(public|private)$"),
     admin: Annotated[dict, Depends(get_current_admin)] = None,
     db: Session = Depends(get_db),
 ):
@@ -284,6 +285,10 @@ async def list_books(
     # 筛选状态
     if status:
         query = query.filter(Book.status == status)
+
+    # 筛选分享类型
+    if share_type:
+        query = query.filter(Book.share_type == share_type)
 
     # 统计总数
     total = query.count()
@@ -302,7 +307,11 @@ async def list_books(
                 "user_id": book.user_id,
                 "user_name": book.user.name if book.user else None,
                 "status": book.status,
+                "share_type": book.share_type,
                 "progress": book.progress,
+                "level": book.level,
+                "read_count": book.read_count,
+                "shelf_count": book.shelf_count,
                 "created_at": book.created_at.isoformat() if book.created_at else None,
             }
             for book in books
@@ -372,6 +381,25 @@ async def update_book_status(
     db.commit()
 
     return MessageResponse(message=f"绘本状态已更新为: {status}")
+
+
+@router.put("/books/{book_id}/share-type", response_model=MessageResponse)
+async def update_book_share_type(
+    book_id: int,
+    share_type: str = Query(..., pattern="^(public|private)$"),
+    admin: Annotated[dict, Depends(get_current_admin)] = None,
+    db: Session = Depends(get_db),
+):
+    """更新绘本分享类型（公开/私有）"""
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="绘本不存在")
+
+    book.share_type = share_type
+    db.commit()
+
+    share_text = "公开" if share_type == "public" else "私有"
+    return MessageResponse(message=f"绘本「{book.title}」已设为{share_text}")
 
 
 @router.delete("/books/{book_id}", response_model=MessageResponse)
