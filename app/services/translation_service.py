@@ -8,7 +8,7 @@ from app.core.config import settings
 class TranslationService:
     """翻译服务 - 使用阿里百炼平台 Qwen 3.5 Plus。
 
-    用于将英文句子翻译成中文，适合儿童绘本阅读。
+    与 OCR 服务使用相同的大模型 API。
     """
 
     def __init__(self):
@@ -45,8 +45,7 @@ class TranslationService:
 要求：
 1. 翻译要准确、自然，适合儿童阅读
 2. 保持原有的语气和风格
-3. 如果有对话，保留引号
-4. 只输出翻译结果，不要添加任何解释或说明
+3. 只输出翻译结果，不要添加任何解释或说明
 
 英文句子：
 {en_text}
@@ -55,10 +54,10 @@ class TranslationService:
                     }
                 ],
                 "max_tokens": 500,
-                "temperature": 0.3,  # 较低温度确保翻译稳定性
+                "temperature": 0.3,
             }
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     self.base_url,
                     headers=headers,
@@ -72,7 +71,6 @@ class TranslationService:
                 result = response.json()
                 content = result["choices"][0]["message"]["content"]
 
-                # 清理返回内容（移除可能的前缀说明）
                 translation = content.strip()
 
                 # 移除可能的前缀
@@ -83,8 +81,9 @@ class TranslationService:
                 return translation
 
         except Exception as e:
-            logger.error(f"翻译失败: {e}")
-            # 返回空字符串，不阻止更新操作
+            logger.error(f"翻译失败: {type(e).__name__} - {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return ""
 
     async def translate_sentences(self, en_texts: list[str]) -> list[str]:
@@ -99,82 +98,13 @@ class TranslationService:
         if not en_texts:
             return []
 
-        # 批量翻译（合并为一个请求，提高效率）
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            }
+        # 逐个翻译（批量翻译容易出错）
+        translations = []
+        for text in en_texts:
+            zh = await self.translate_sentence(text)
+            translations.append(zh)
 
-            # 构建批量翻译提示
-            sentences_text = "\n".join([f"{i+1}. {text}" for i, text in enumerate(en_texts)])
-
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": f"""请将以下英文句子翻译成中文，按序号对应输出。
-
-要求：
-1. 翻译要准确、自然，适合儿童阅读
-2. 保持原有的语气和风格
-3. 每行一个翻译，格式为：序号. 中文翻译
-4. 只输出翻译结果，不要添加任何解释
-
-英文句子：
-{sentences_text}
-
-中文翻译：""",
-                    }
-                ],
-                "max_tokens": 2000,
-                "temperature": 0.3,
-            }
-
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    self.base_url,
-                    headers=headers,
-                    json=payload,
-                )
-
-                if response.status_code != 200:
-                    logger.error(f"批量翻译 API 调用失败: {response.status_code}")
-                    # 降级为逐个翻译
-                    return [await self.translate_sentence(text) for text in en_texts]
-
-                result = response.json()
-                content = result["choices"][0]["message"]["content"]
-
-                # 解析返回的翻译列表
-                translations = []
-                for line in content.strip().split("\n"):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    # 移除序号前缀
-                    if line and line[0].isdigit():
-                        # 格式: "1. 翻译内容"
-                        parts = line.split(".", 1)
-                        if len(parts) > 1:
-                            translations.append(parts[1].strip())
-                        else:
-                            translations.append(line)
-                    else:
-                        translations.append(line)
-
-                # 确保返回数量与输入一致
-                while len(translations) < len(en_texts):
-                    translations.append(await self.translate_sentence(en_texts[len(translations)]))
-
-                logger.info(f"批量翻译成功: {len(translations)} 个句子")
-                return translations[:len(en_texts)]
-
-        except Exception as e:
-            logger.error(f"批量翻译失败: {e}")
-            # 降级为逐个翻译
-            return [await self.translate_sentence(text) for text in en_texts]
+        return translations
 
 
 # 全局实例
