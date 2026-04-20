@@ -221,6 +221,7 @@ class SentenceResponse(SentenceBase):
     audio_us_slow: Optional[str] = None
     audio_gb_normal: Optional[str] = None
     audio_gb_slow: Optional[str] = None
+    status: str = "pending"  # pending, translating, generating_tts, completed, error
     created_at: datetime
 
     class Config:
@@ -381,6 +382,7 @@ class AdminSentenceResponse(BaseModel):
     audio_us_slow: Optional[str] = None
     audio_gb_normal: Optional[str] = None
     audio_gb_slow: Optional[str] = None
+    status: str = "pending"
 
 
 class AdminBookPageResponse(BaseModel):

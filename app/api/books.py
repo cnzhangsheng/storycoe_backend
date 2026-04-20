@@ -150,6 +150,7 @@ async def process_generate_ocr_task(book_id: int, image_urls: list[str]):
                     sentence_order=j + 1,
                     en=sentence.en.strip(),
                     zh=sentence.zh.strip() if sentence.zh else "",
+                    status="pending",  # OCR 后需要生成 TTS
                 )
                 db.add(sentence_record)
                 db.flush()  # 获取 sentence_id
@@ -162,6 +163,12 @@ async def process_generate_ocr_task(book_id: int, image_urls: list[str]):
         # 并行生成所有句子的 TTS 音频
         if sentence_records:
             logger.info(f"[TTS] 开始生成音频: {len(sentence_records)} 个句子")
+
+            # 更新所有句子状态为 generating_tts
+            for sr in sentence_records:
+                sr.status = "generating_tts"
+            db.commit()
+
             tts_tasks = [
                 tts_service.generate_all_accents(
                     text=sr.en,
@@ -172,16 +179,20 @@ async def process_generate_ocr_task(book_id: int, image_urls: list[str]):
             ]
             tts_results = await asyncio.gather(*tts_tasks, return_exceptions=True)
 
-            # 更新句子的音频 URL
+            # 更新句子的音频 URL 和状态
             for sr, result in zip(sentence_records, tts_results):
                 if isinstance(result, Exception):
                     logger.error(f"[TTS] 音频生成失败: sentence_id={sr.id}, error={result}")
+                    sr.status = "error"
                     continue
                 if result:
                     sr.audio_us_normal = result.get("us_normal")
                     sr.audio_us_slow = result.get("us_slow")
                     sr.audio_gb_normal = result.get("gb_normal")
                     sr.audio_gb_slow = result.get("gb_slow")
+                    sr.status = "completed"
+                else:
+                    sr.status = "error"
 
             db.commit()
             logger.info(f"[TTS] 音频生成完成: {len(sentence_records)} 个句子")
@@ -291,11 +302,86 @@ async def create_sentence(
     book_id: int,
     page_number: int,
     sentence_data: SentenceCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[dict, Depends(get_current_user)],
     book_service: Annotated[BookService, Depends(get_book_service)],
 ):
-    """Create a new sentence in a book page."""
+    """创建句子。
+
+    创建后会在后台异步翻译中文（如果没有提供）并生成 TTS 音频。
+    返回结果中 status=pending 表示正在后台处理。
+    """
     sentence = book_service.create_sentence(book_id, current_user["id"], page_number, sentence_data)
+
+    # 如果需要后台处理，启动任务
+    if sentence["status"] == "pending" and sentence["en"]:
+        async def do_regenerate():
+            """后台任务：翻译 + 生成 TTS"""
+            from app.core.database import SessionLocal
+            from app.models.db_models import Sentence, Book, BookPage
+            from app.services.translation_service import translation_service
+            from app.services.tts_service import tts_service
+
+            db = SessionLocal()
+            try:
+                sentence_id = sentence["id"]
+                sentence_obj = db.query(Sentence).filter(Sentence.id == sentence_id).first()
+                if not sentence_obj:
+                    return
+
+                # 获取 book_id
+                page = db.query(BookPage).filter(BookPage.id == sentence_obj.page_id).first()
+                book = db.query(Book).filter(Book.id == page.book_id).first() if page else None
+                if not book:
+                    return
+
+                # 翻译（如果没有中文或中文为空）
+                if not sentence_obj.zh and sentence_obj.en:
+                    sentence_obj.status = "translating"
+                    db.commit()
+                    logger.info(f"[Regenerate] 开始翻译: sentence_id={sentence_id}")
+                    new_zh = await translation_service.translate_sentence(sentence_obj.en)
+                    if new_zh:
+                        sentence_obj.zh = new_zh
+                        db.commit()
+                        logger.info(f"[Regenerate] 翻译完成: sentence_id={sentence_id}")
+
+                # 生成 TTS 音频
+                if sentence_obj.en:
+                    sentence_obj.status = "generating_tts"
+                    db.commit()
+                    logger.info(f"[Regenerate] 开始生成 TTS: sentence_id={sentence_id}")
+                    tts_result = await tts_service.generate_all_accents(
+                        text=sentence_obj.en,
+                        book_id=book.id,
+                        sentence_id=sentence_obj.id,
+                    )
+                    if tts_result:
+                        sentence_obj.audio_us_normal = tts_result.get("us_normal")
+                        sentence_obj.audio_us_slow = tts_result.get("us_slow")
+                        sentence_obj.audio_gb_normal = tts_result.get("gb_normal")
+                        sentence_obj.audio_gb_slow = tts_result.get("gb_slow")
+                        sentence_obj.status = "completed"
+                        db.commit()
+                        logger.info(f"[Regenerate] TTS 生成完成: sentence_id={sentence_id}")
+                    else:
+                        sentence_obj.status = "error"
+                        db.commit()
+
+            except Exception as e:
+                logger.error(f"[Regenerate] 后台任务失败: {e}")
+                try:
+                    sentence_obj = db.query(Sentence).filter(Sentence.id == sentence_id).first()
+                    if sentence_obj:
+                        sentence_obj.status = "error"
+                        db.commit()
+                except:
+                    pass
+            finally:
+                db.close()
+
+        background_tasks.add_task(do_regenerate)
+
     return SentenceResponse(**sentence)
 
 
@@ -310,33 +396,77 @@ async def update_sentence(
 ):
     """更新句子。
 
-    当英文句子有变化时，会在后台异步翻译成中文。
-    返回结果中 translating=True 表示正在翻译中。
+    当英文句子有变化时，会在后台异步翻译成中文并重新生成 TTS 音频。
+    返回结果中 status=pending 表示正在后台处理。
     """
     sentence = await book_service.update_sentence(book_id, current_user["id"], sentence_id, sentence_data)
 
-    # 如果需要翻译，启动后台任务
-    if sentence.pop("translating", False):
-        from app.core.database import SessionLocal
-        from app.services.translation_service import translation_service
-        from app.models.db_models import Sentence
+    # 如果状态为 pending，启动后台任务
+    if sentence["status"] == "pending" and sentence["en"]:
+        async def do_regenerate():
+            """后台任务：翻译 + 生成 TTS"""
+            from app.core.database import SessionLocal
+            from app.models.db_models import Sentence, Book, BookPage
+            from app.services.translation_service import translation_service
+            from app.services.tts_service import tts_service
 
-        async def do_translate():
-            """后台翻译任务"""
             db = SessionLocal()
             try:
                 sentence_obj = db.query(Sentence).filter(Sentence.id == sentence_id).first()
-                if sentence_obj and sentence_obj.en:
+                if not sentence_obj:
+                    return
+
+                # 获取 book_id
+                page = db.query(BookPage).filter(BookPage.id == sentence_obj.page_id).first()
+                book = db.query(Book).filter(Book.id == page.book_id).first() if page else None
+                if not book:
+                    return
+
+                # 翻译
+                if sentence_obj.en:
+                    sentence_obj.status = "translating"
+                    db.commit()
+                    logger.info(f"[Regenerate] 开始翻译: sentence_id={sentence_id}")
                     new_zh = await translation_service.translate_sentence(sentence_obj.en)
                     if new_zh:
                         sentence_obj.zh = new_zh
                         db.commit()
+                        logger.info(f"[Regenerate] 翻译完成: sentence_id={sentence_id}")
+
+                # 生成 TTS 音频
+                sentence_obj.status = "generating_tts"
+                db.commit()
+                logger.info(f"[Regenerate] 开始生成 TTS: sentence_id={sentence_id}")
+                tts_result = await tts_service.generate_all_accents(
+                    text=sentence_obj.en,
+                    book_id=book.id,
+                    sentence_id=sentence_obj.id,
+                )
+                if tts_result:
+                    sentence_obj.audio_us_normal = tts_result.get("us_normal")
+                    sentence_obj.audio_us_slow = tts_result.get("us_slow")
+                    sentence_obj.audio_gb_normal = tts_result.get("gb_normal")
+                    sentence_obj.audio_gb_slow = tts_result.get("gb_slow")
+                    sentence_obj.status = "completed"
+                    db.commit()
+                    logger.info(f"[Regenerate] TTS 生成完成: sentence_id={sentence_id}")
+                else:
+                    sentence_obj.status = "error"
+                    db.commit()
+
             except Exception as e:
-                print(f"翻译失败: {e}")
+                logger.error(f"[Regenerate] 后台任务失败: {e}")
+                try:
+                    sentence_obj = db.query(Sentence).filter(Sentence.id == sentence_id).first()
+                    if sentence_obj:
+                        sentence_obj.status = "error"
+                        db.commit()
+                except:
+                    pass
             finally:
                 db.close()
 
-        background_tasks.add_task(do_translate)
+        background_tasks.add_task(do_regenerate)
 
     return SentenceResponse(**sentence)
 

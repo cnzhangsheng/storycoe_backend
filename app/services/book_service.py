@@ -207,6 +207,7 @@ class BookService:
                         "audio_us_slow": s.audio_us_slow,
                         "audio_gb_normal": s.audio_gb_normal,
                         "audio_gb_slow": s.audio_gb_slow,
+                        "status": s.status,
                         "created_at": s.created_at,
                     }
                     for s in sentences
@@ -315,7 +316,11 @@ class BookService:
                     "sentence_order": s.sentence_order,
                     "en": s.en,
                     "zh": s.zh,
-                    "audio_url": s.audio_url,
+                    "audio_us_normal": s.audio_us_normal,
+                    "audio_us_slow": s.audio_us_slow,
+                    "audio_gb_normal": s.audio_gb_normal,
+                    "audio_gb_slow": s.audio_gb_slow,
+                    "status": s.status,
                     "created_at": s.created_at,
                 }
                 for s in sentences
@@ -399,12 +404,15 @@ class BookService:
             "audio_us_slow": sentence.audio_us_slow,
             "audio_gb_normal": sentence.audio_gb_normal,
             "audio_gb_slow": sentence.audio_gb_slow,
+            "status": sentence.status,
             "created_at": sentence.created_at,
-            "translating": False,
         }
 
+        # 如果英文有变化，更新状态为 pending（需要重新翻译和生成 TTS）
         if new_en is not None and new_en != old_en:
-            result["translating"] = True
+            sentence.status = "pending"
+            self.db.commit()
+            result["status"] = "pending"
 
         return result
 
@@ -431,6 +439,7 @@ class BookService:
             sentence_order=new_order,
             en=sentence_data.en,
             zh=sentence_data.zh or "",
+            status="pending",  # 新创建的句子需要处理
         )
         self.db.add(sentence)
         self.db.commit()
@@ -448,6 +457,7 @@ class BookService:
             "audio_us_slow": sentence.audio_us_slow,
             "audio_gb_normal": sentence.audio_gb_normal,
             "audio_gb_slow": sentence.audio_gb_slow,
+            "status": sentence.status,
             "created_at": sentence.created_at,
         }
 

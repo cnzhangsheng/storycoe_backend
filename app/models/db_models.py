@@ -179,6 +179,8 @@ class Sentence(Base):
     audio_us_slow: Mapped[str | None] = mapped_column(String(500), nullable=True)
     audio_gb_normal: Mapped[str | None] = mapped_column(String(500), nullable=True)
     audio_gb_slow: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # 状态：pending=待处理, translating=翻译中, generating_tts=生成音频中, completed=完成, error=失败
+    status: Mapped[str] = mapped_column(String(20), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # 关系

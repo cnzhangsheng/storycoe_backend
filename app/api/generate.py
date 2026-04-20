@@ -147,6 +147,7 @@ async def process_ocr_task(book_id: int, page_data_list: List[tuple]):
                     sentence_order=j + 1,
                     en=sentence.en.strip(),
                     zh=sentence.zh.strip() if sentence.zh else "",
+                    status="pending",  # OCR 后需要生成 TTS
                 )
                 db.add(sentence_record)
                 db.flush()  # 获取 sentence_id
@@ -159,6 +160,12 @@ async def process_ocr_task(book_id: int, page_data_list: List[tuple]):
         # 并行生成所有句子的 TTS 音频
         if sentence_records:
             logger.info(f"[TTS] 开始生成音频: {len(sentence_records)} 个句子")
+
+            # 更新所有句子状态为 generating_tts
+            for sr in sentence_records:
+                sr.status = "generating_tts"
+            db.commit()
+
             tts_tasks = [
                 tts_service.generate_all_accents(
                     text=sr.en,
@@ -169,16 +176,20 @@ async def process_ocr_task(book_id: int, page_data_list: List[tuple]):
             ]
             tts_results = await asyncio.gather(*tts_tasks, return_exceptions=True)
 
-            # 更新句子的音频 URL
+            # 更新句子的音频 URL 和状态
             for sr, result in zip(sentence_records, tts_results):
                 if isinstance(result, Exception):
                     logger.error(f"[TTS] 音频生成失败: sentence_id={sr.id}, error={result}")
+                    sr.status = "error"
                     continue
                 if result:
                     sr.audio_us_normal = result.get("us_normal")
                     sr.audio_us_slow = result.get("us_slow")
                     sr.audio_gb_normal = result.get("gb_normal")
                     sr.audio_gb_slow = result.get("gb_slow")
+                    sr.status = "completed"
+                else:
+                    sr.status = "error"
 
             db.commit()
             logger.info(f"[TTS] 音频生成完成: {len(sentence_records)} 个句子")
@@ -236,6 +247,7 @@ async def process_single_page_ocr(page_id: int, image_data: bytes):
                 sentence_order=j + 1,
                 en=sentence.en.strip(),
                 zh=sentence.zh.strip() if sentence.zh else "",
+                status="pending",  # OCR 后需要生成 TTS
             )
             db.add(sentence_record)
             db.flush()  # 获取 sentence_id
@@ -250,6 +262,12 @@ async def process_single_page_ocr(page_id: int, image_data: bytes):
             book = db.query(Book).filter(Book.id == page.book_id).first()
             if book:
                 logger.info(f"[TTS] 开始生成音频: {len(sentence_records)} 个句子")
+
+                # 更新所有句子状态为 generating_tts
+                for sr in sentence_records:
+                    sr.status = "generating_tts"
+                db.commit()
+
                 tts_tasks = [
                     tts_service.generate_all_accents(
                         text=sr.en,
@@ -260,16 +278,20 @@ async def process_single_page_ocr(page_id: int, image_data: bytes):
                 ]
                 tts_results = await asyncio.gather(*tts_tasks, return_exceptions=True)
 
-                # 更新句子的音频 URL
+                # 更新句子的音频 URL 和状态
                 for sr, result in zip(sentence_records, tts_results):
                     if isinstance(result, Exception):
                         logger.error(f"[TTS] 音频生成失败: sentence_id={sr.id}, error={result}")
+                        sr.status = "error"
                         continue
                     if result:
                         sr.audio_us_normal = result.get("us_normal")
                         sr.audio_us_slow = result.get("us_slow")
                         sr.audio_gb_normal = result.get("gb_normal")
                         sr.audio_gb_slow = result.get("gb_slow")
+                        sr.status = "completed"
+                    else:
+                        sr.status = "error"
 
                 db.commit()
                 logger.info(f"[TTS] 音频生成完成: {len(sentence_records)} 个句子")

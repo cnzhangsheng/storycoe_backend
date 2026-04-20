@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS sentences (
     audio_us_slow VARCHAR(500),    -- 美式英语慢速音频
     audio_gb_normal VARCHAR(500),  -- 英式英语正常语速音频
     audio_gb_slow VARCHAR(500),    -- 英式英语慢速音频
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending, translating, generating_tts, completed, error
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
