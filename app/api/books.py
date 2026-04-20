@@ -297,6 +297,56 @@ async def get_book_page(
     return BookPageDetailResponse(**page)
 
 
+@router.post("/{book_id}/sentences/{sentence_id}/translate")
+async def translate_sentence(
+    book_id: int,
+    sentence_id: int,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    book_service: Annotated[BookService, Depends(get_book_service)],
+):
+    """翻译句子。
+
+    调用大模型翻译英文句子为中文，返回翻译结果。
+    """
+    from app.services.translation_service import translation_service
+
+    # 验证权限
+    book = book_service.get_book(book_id, current_user["id"])
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍未找到")
+
+    # 获取句子
+    sentence = book_service.db.query(Sentence).filter(Sentence.id == sentence_id).first()
+    if not sentence:
+        raise HTTPException(status_code=404, detail="句子未找到")
+
+    if not sentence.en:
+        raise HTTPException(status_code=400, detail="句子没有英文内容")
+
+    # 调用翻译服务
+    logger.info(f"[Translate] 开始翻译: sentence_id={sentence_id}, en={sentence.en}")
+    zh = await translation_service.translate_sentence(sentence.en)
+
+    if zh:
+        # 更新数据库
+        sentence.zh = zh
+        book_service.db.commit()
+        logger.info(f"[Translate] 翻译完成: sentence_id={sentence_id}, zh={zh}")
+
+        return {
+            "success": True,
+            "sentence_id": sentence_id,
+            "zh": zh,
+        }
+    else:
+        return {
+            "success": False,
+            "sentence_id": sentence_id,
+            "zh": "",
+            "message": "翻译失败",
+        }
+
+
 @router.post("/{book_id}/pages/{page_number}/sentences", response_model=SentenceResponse)
 async def create_sentence(
     book_id: int,
@@ -335,10 +385,8 @@ async def create_sentence(
                 if not book:
                     return
 
-                # 翻译（如果没有中文或中文为空）
+                # 翻译（如果没有中文或中文为空）- 不改变 status
                 if not sentence_obj.zh and sentence_obj.en:
-                    sentence_obj.status = "translating"
-                    db.commit()
                     logger.info(f"[Regenerate] 开始翻译: sentence_id={sentence_id}")
                     new_zh = await translation_service.translate_sentence(sentence_obj.en)
                     if new_zh:
@@ -346,7 +394,7 @@ async def create_sentence(
                         db.commit()
                         logger.info(f"[Regenerate] 翻译完成: sentence_id={sentence_id}")
 
-                # 生成 TTS 音频
+                # 生成 TTS 音频 - 更新 status
                 if sentence_obj.en:
                     sentence_obj.status = "generating_tts"
                     db.commit()
@@ -401,7 +449,7 @@ async def update_sentence(
     """
     sentence = await book_service.update_sentence(book_id, current_user["id"], sentence_id, sentence_data)
 
-    # 如果状态为 pending，启动后台任务
+    # 如果状态为 pending，启动后台任务（只生成 TTS）
     if sentence["status"] == "pending" and sentence["en"]:
         async def do_regenerate():
             """后台任务：翻译 + 生成 TTS"""
@@ -422,10 +470,8 @@ async def update_sentence(
                 if not book:
                     return
 
-                # 翻译
-                if sentence_obj.en:
-                    sentence_obj.status = "translating"
-                    db.commit()
+                # 翻译（如果没有中文）- 不改变 status
+                if not sentence_obj.zh and sentence_obj.en:
                     logger.info(f"[Regenerate] 开始翻译: sentence_id={sentence_id}")
                     new_zh = await translation_service.translate_sentence(sentence_obj.en)
                     if new_zh:
@@ -433,7 +479,7 @@ async def update_sentence(
                         db.commit()
                         logger.info(f"[Regenerate] 翻译完成: sentence_id={sentence_id}")
 
-                # 生成 TTS 音频
+                # 生成 TTS 音频 - 更新 status
                 sentence_obj.status = "generating_tts"
                 db.commit()
                 logger.info(f"[Regenerate] 开始生成 TTS: sentence_id={sentence_id}")
