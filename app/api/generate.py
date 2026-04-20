@@ -226,15 +226,53 @@ async def process_single_page_ocr(page_id: int, image_data: bytes):
         # 运行 OCR
         sentences = await ocr_service.recognize_image(image_data)
 
-        # 保存句子
+        # 保存句子并收集用于 TTS
+        sentence_records = []
         for j, sentence in enumerate(sentences):
+            if not sentence.en.strip():
+                continue
             sentence_record = Sentence(
                 page_id=page.id,
                 sentence_order=j + 1,
-                en=sentence.en,
-                zh=sentence.zh,
+                en=sentence.en.strip(),
+                zh=sentence.zh.strip() if sentence.zh else "",
             )
             db.add(sentence_record)
+            db.flush()  # 获取 sentence_id
+            sentence_records.append(sentence_record)
+
+        db.commit()
+        logger.info(f"单页 OCR 保存句子: {len(sentence_records)} 个")
+
+        # 并行生成所有句子的 TTS 音频
+        if sentence_records:
+            # 获取 book_id
+            book = db.query(Book).filter(Book.id == page.book_id).first()
+            if book:
+                logger.info(f"[TTS] 开始生成音频: {len(sentence_records)} 个句子")
+                tts_tasks = [
+                    tts_service.generate_all_accents(
+                        text=sr.en,
+                        book_id=book.id,
+                        sentence_id=sr.id,
+                    )
+                    for sr in sentence_records
+                ]
+                tts_results = await asyncio.gather(*tts_tasks, return_exceptions=True)
+
+                # 更新句子的音频 URL
+                for sr, result in zip(sentence_records, tts_results):
+                    if isinstance(result, Exception):
+                        logger.error(f"[TTS] 音频生成失败: sentence_id={sr.id}, error={result}")
+                        continue
+                    if result:
+                        sr.audio_us_normal = result.get("us_normal")
+                        sr.audio_us_slow = result.get("us_slow")
+                        sr.audio_gb_normal = result.get("gb_normal")
+                        sr.audio_gb_slow = result.get("gb_slow")
+
+                db.commit()
+                logger.info(f"[TTS] 音频生成完成: {len(sentence_records)} 个句子")
 
         # 更新页面状态为完成
         page.status = "completed"
